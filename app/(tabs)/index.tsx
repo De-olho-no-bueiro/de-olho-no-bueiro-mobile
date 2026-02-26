@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, useRef } from 'react';
 import {
   Alert,
   Platform,
@@ -11,7 +11,7 @@ import {
   KeyboardAvoidingView,
   ActivityIndicator,
 } from 'react-native';
-import MapView, { Marker } from 'react-native-maps';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
 import * as ImagePicker from 'expo-image-picker';
 import { ThemedText } from '@/components/themed-text';
@@ -25,7 +25,18 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors } from '@/constants/theme';
 import { Image } from 'expo-image';
 
+const MapViewComponent = Platform.OS !== 'web' 
+  ? require('@/components/map-view').default 
+  : null;
+
 type Coordenadas = { latitude: number; longitude: number };
+
+type Region = {
+  latitude: number;
+  longitude: number;
+  latitudeDelta: number;
+  longitudeDelta: number;
+};
 
 const REGIAO_INICIAL = {
   latitude: -23.5505,
@@ -51,6 +62,7 @@ export default function MapScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const isDark = colorScheme === 'dark';
+  const insets = useSafeAreaInsets();
 
   const [userLocation, setUserLocation] = useState<Coordenadas | null>(null);
   const [selectedPoint, setSelectedPoint] = useState<Coordenadas | null>(null);
@@ -61,6 +73,26 @@ export default function MapScreen() {
   const [loadingLocation, setLoadingLocation] = useState(true);
   const [loadingAddress, setLoadingAddress] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
+
+  const [searchText, setSearchText] = useState('');
+  const [searching, setSearching] = useState(false);
+  const [searchError, setSearchError] = useState('');
+  const [searchSuggestions, setSearchSuggestions] = useState<Location.LocationGeocodedAddress[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const mapRef = useRef<any>(null);
+  const [mapRegion, setMapRegion] = useState<Region | undefined>(undefined);
+  const [hasCenteredOnUser, setHasCenteredOnUser] = useState(false);
+
+  type FiltroOpcao = 'todos' | 'mais-graves' | 'ultimos-7-dias' | 'alagamentos' | 'bueiros';
+  const [filtroAtivo, setFiltroAtivo] = useState<FiltroOpcao>('todos');
+
+  const FILTROS: { key: FiltroOpcao; label: string; icon: string }[] = [
+    { key: 'todos', label: 'Todos', icon: 'map' },
+    { key: 'mais-graves', label: 'Mais Graves', icon: 'exclamationmark.triangle' },
+    { key: 'ultimos-7-dias', label: 'Últimos 7 Dias', icon: 'clock' },
+    { key: 'alagamentos', label: 'Alagamentos', icon: 'water' },
+    { key: 'bueiros', label: 'Bueiros', icon: 'manhole' },
+  ];
 
   const [tipo, setTipo] = useState<TipoReporte>('alagamento');
   const [nivel, setNivel] = useState<NivelAlagamento>('leve');
@@ -100,13 +132,17 @@ export default function MapScreen() {
     carregarReportes().then(setSavedReportes);
   }, []);
 
-  const initialRegion = userLocation
-    ? {
+  useEffect(() => {
+    if (userLocation && !hasCenteredOnUser) {
+      const newRegion: Region = {
         ...userLocation,
         latitudeDelta: 0.02,
         longitudeDelta: 0.02,
-      }
-    : REGIAO_INICIAL;
+      };
+      setMapRegion(newRegion);
+      setHasCenteredOnUser(true);
+    }
+  }, [userLocation, hasCenteredOnUser]);
 
   const buscarEndereco = useCallback(async (lat: number, lon: number) => {
     setLoadingAddress(true);
@@ -133,6 +169,105 @@ export default function MapScreen() {
     }
   }, []);
 
+  const buscarSugestoes = useCallback(async (text: string) => {
+    if (text.length < 3) {
+      setSearchSuggestions([]);
+      return;
+    }
+    try {
+      const results = await Location.geocodeAsync(text);
+      if (results.length > 0) {
+        const addresses: Location.LocationGeocodedAddress[] = [];
+        for (const coords of results.slice(0, 5)) {
+          const reverse = await Location.reverseGeocodeAsync(coords);
+          if (reverse[0]) {
+            addresses.push(reverse[0]);
+          }
+        }
+        setSearchSuggestions(addresses);
+      } else {
+        setSearchSuggestions([]);
+      }
+    } catch {
+      setSearchSuggestions([]);
+    }
+  }, []);
+
+  const buscarPorEndereco = useCallback(async () => {
+    if (!searchText.trim()) return;
+    setSearching(true);
+    setSearchError('');
+    setShowSuggestions(false);
+    try {
+      const results = await Location.geocodeAsync(searchText.trim());
+      if (results.length === 0) {
+        setSearchError('Endereço não encontrado');
+        setSearching(false);
+        return;
+      }
+      const { latitude, longitude } = results[0];
+      const newRegion: Region = {
+        latitude,
+        longitude,
+        latitudeDelta: 0.015,
+        longitudeDelta: 0.015,
+      };
+      setMapRegion(newRegion);
+      (mapRef.current as any)?.animateToRegion(newRegion, 500);
+      setSearchText('');
+      setSearchSuggestions([]);
+    } catch {
+      setSearchError('Erro ao buscar endereço');
+    } finally {
+      setSearching(false);
+    }
+  }, [searchText]);
+
+  const selecionarSugestao = useCallback((address: Location.LocationGeocodedAddress) => {
+    const searchString = [
+      address.street,
+      address.streetNumber,
+      address.district,
+      address.city,
+    ].filter(Boolean).join(', ');
+    
+    Location.geocodeAsync(searchString).then((results) => {
+      if (results.length > 0) {
+        const { latitude, longitude } = results[0];
+        const newRegion: Region = {
+          latitude,
+          longitude,
+          latitudeDelta: 0.015,
+          longitudeDelta: 0.015,
+        };
+        setMapRegion(newRegion);
+        (mapRef.current as any)?.animateToRegion(newRegion, 500);
+      }
+    });
+    
+    setSearchText(searchString);
+    setShowSuggestions(false);
+    setSearchSuggestions([]);
+  }, []);
+
+  const filteredReportes = useCallback(() => {
+    let filtered = savedReportes;
+    
+    if (filtroAtivo === 'mais-graves') {
+      filtered = filtered.filter(r => r.nivel === 'grave');
+    } else if (filtroAtivo === 'ultimos-7-dias') {
+      const seteDiasAtras = new Date();
+      seteDiasAtras.setDate(seteDiasAtras.getDate() - 7);
+      filtered = filtered.filter(r => new Date(r.dataHora) >= seteDiasAtras);
+    } else if (filtroAtivo === 'alagamentos') {
+      filtered = filtered.filter(r => r.tipo === 'alagamento');
+    } else if (filtroAtivo === 'bueiros') {
+      filtered = filtered.filter(r => r.tipo === 'bueiro');
+    }
+    
+    return filtered;
+  }, [savedReportes, filtroAtivo]);
+
   const aoClicarNoMapa = useCallback(
     (e: { nativeEvent: { coordinate: Coordenadas } }) => {
       const { latitude, longitude } = e.nativeEvent.coordinate;
@@ -158,6 +293,13 @@ export default function MapScreen() {
       Alert.alert('Aguarde', 'Obtendo sua localização...');
       return;
     }
+    const newRegion: Region = {
+      ...userLocation,
+      latitudeDelta: 0.02,
+      longitudeDelta: 0.02,
+    };
+    setMapRegion(newRegion);
+    mapRef.current?.animateToRegion(newRegion, 500);
     setSelectedPoint(userLocation);
     buscarEnderecoParaConfirmacao(userLocation.latitude, userLocation.longitude);
   }, [userLocation, buscarEnderecoParaConfirmacao]);
@@ -262,31 +404,101 @@ export default function MapScreen() {
 
   return (
     <ThemedView style={styles.container}>
-      <MapView
-        key={userLocation ? 'centered' : 'default'}
-        style={styles.map}
-        initialRegion={initialRegion}
-        onPress={aoClicarNoMapa}
-        showsUserLocation
-        showsMyLocationButton
-      >
-        {savedReportes.map((r) => (
-          <Marker
-            key={r.id}
-            coordinate={{ latitude: r.latitude, longitude: r.longitude }}
-            title={r.tipo === 'alagamento' ? 'Alagamento' : 'Bueiro'}
-            description={r.endereco}
-            pinColor={colors.tint}
+      <View style={[styles.searchContainer, { backgroundColor: colors.surface, paddingTop: insets.top + 8 }]}>
+        <View style={[styles.searchBar, { backgroundColor: colors.background, borderColor: colors.border }]}>
+          <IconSymbol name="magnifyingglass" size={20} color={colors.icon} />
+          <TextInput
+            style={[styles.searchInput, { color: colors.text }]}
+            placeholder="Buscar bairro ou endereço..."
+            placeholderTextColor={colors.icon}
+            value={searchText}
+            onChangeText={(text) => {
+              setSearchText(text);
+              setSearchError('');
+              buscarSugestoes(text);
+              setShowSuggestions(text.length >= 3);
+            }}
+            onSubmitEditing={buscarPorEndereco}
+            returnKeyType="search"
+            onFocus={() => searchText.length >= 3 && setShowSuggestions(true)}
+            onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
           />
-        ))}
-        {selectedPoint && (
-          <Marker
-            coordinate={selectedPoint}
-            title="Novo ponto"
-            pinColor="#e74c3c"
-          />
+          {searching ? (
+            <ActivityIndicator size="small" color={colors.tint} />
+          ) : searchText.length > 0 ? (
+            <TouchableOpacity onPress={() => { setSearchText(''); setSearchError(''); setSearchSuggestions([]); }}>
+              <IconSymbol name="xmark.circle.fill" size={20} color={colors.icon} />
+            </TouchableOpacity>
+          ) : null}
+        </View>
+        
+        {showSuggestions && searchSuggestions.length > 0 && (
+          <View style={[styles.suggestionsContainer, { backgroundColor: colors.background, borderColor: colors.border }]}>
+            {searchSuggestions.map((addr, index) => {
+              const addrStr = [addr.street, addr.streetNumber, addr.district, addr.city].filter(Boolean).join(', ');
+              return (
+                <TouchableOpacity
+                  key={index}
+                  style={[styles.suggestionItem, { borderBottomColor: colors.border }]}
+                  onPress={() => selecionarSugestao(addr)}
+                >
+                  <ThemedText numberOfLines={1}>{addrStr}</ThemedText>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
         )}
-      </MapView>
+
+        {searchError ? (
+          <ThemedText style={styles.searchError}>{searchError}</ThemedText>
+        ) : null}
+
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.filtersContainer}
+          contentContainerStyle={styles.filtersContent}
+        >
+          {FILTROS.map((filtro) => (
+            <TouchableOpacity
+              key={filtro.key}
+              style={[
+                styles.filterChip,
+                { backgroundColor: filtroAtivo === filtro.key ? colors.tint : colors.surface },
+              ]}
+              onPress={() => setFiltroAtivo(filtro.key)}
+            >
+              <IconSymbol
+                name={filtro.icon as any}
+                size={14}
+                color={filtroAtivo === filtro.key ? (isDark ? colors.background : '#fff') : colors.text}
+              />
+              <ThemedText
+                style={[
+                  styles.filterLabel,
+                  { color: filtroAtivo === filtro.key ? (isDark ? colors.background : '#fff') : colors.text },
+                ]}
+              >
+                {filtro.label}
+              </ThemedText>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
+
+      {MapViewComponent ? (
+        <MapViewComponent
+          mapRef={mapRef}
+          region={mapRegion}
+          onPress={aoClicarNoMapa}
+          savedReportes={filteredReportes()}
+          selectedPoint={selectedPoint}
+          colors={colors}
+          tintColor={colors.tint}
+        />
+      ) : (
+        <View style={[styles.map, styles.centered]} />
+      )}
 
       {loadingLocation && (
         <View style={[styles.loadingOverlay, { backgroundColor: loadingOverlayBg }]}>
@@ -295,7 +507,7 @@ export default function MapScreen() {
         </View>
       )}
 
-      <View style={[styles.buttons, { backgroundColor: colors.surface }]}>
+      <View style={[styles.buttons, { backgroundColor: colors.surface, paddingBottom: Math.max(16, insets.bottom + 16) }]}>
         {selectedPoint && !modalVisible ? (
           <>
             <TouchableOpacity
@@ -356,7 +568,7 @@ export default function MapScreen() {
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={styles.modalOverlay}
         >
-          <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
+          <View style={[styles.modalContent, { backgroundColor: colors.background, paddingBottom: Math.max(16, insets.bottom + 16) }]}>
             <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
               <ThemedText type="subtitle">Novo reporte</ThemedText>
               <TouchableOpacity onPress={fecharModal}>
@@ -481,6 +693,72 @@ export default function MapScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  searchContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 10,
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+  },
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    gap: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    paddingVertical: 0,
+  },
+  suggestionsContainer: {
+    position: 'absolute',
+    top: 54,
+    left: 0,
+    right: 0,
+    borderWidth: 1,
+    borderRadius: 12,
+    marginTop: 4,
+    maxHeight: 200,
+    zIndex: 20,
+    overflow: 'hidden',
+  },
+  suggestionItem: {
+    padding: 12,
+    borderBottomWidth: 1,
+  },
+  filtersContainer: {
+    marginTop: 12,
+    marginHorizontal: -16,
+    paddingHorizontal: 16,
+  },
+  filtersContent: {
+    gap: 8,
+    paddingRight: 16,
+  },
+  filterChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    gap: 6,
+  },
+  filterLabel: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  searchError: {
+    marginTop: 6,
+    fontSize: 12,
+    color: '#e74c3c',
+    textAlign: 'center',
   },
   map: {
     flex: 1,
