@@ -220,30 +220,46 @@ export function MapScreen() {
             </TouchableOpacity>
           </View>
         ) : vm.selectedPoint && !vm.modalVisible ? (
-          <>
-            <TouchableOpacity
-              style={[styles.button, styles.buttonConfirmar, { backgroundColor: colors.tint }]}
-              onPress={vm.confirmarLocalAbrirForm}
-              disabled={vm.loadingConfirmationAddress}
-            >
-              {vm.loadingConfirmationAddress ? (
-                <ActivityIndicator size="small" color={isDark ? colors.background : '#fff'} />
-              ) : (
+          <View>
+            <View style={{ marginBottom: 16 }}>
+              <ThemedText style={{ fontSize: 13, fontWeight: '600', color: colors.icon, marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                Local Selecionado
+              </ThemedText>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : '#F8FAFC', padding: 12, borderRadius: 12, borderWidth: 1, borderColor: colors.border }}>
+                <IconSymbol name="mappin.circle.fill" size={28} color={colors.tint} />
+                <View style={{ flex: 1 }}>
+                  {vm.loadingConfirmationAddress ? (
+                    <ActivityIndicator size="small" color={colors.tint} style={{ alignSelf: 'flex-start' }} />
+                  ) : (
+                    <ThemedText style={{ fontSize: 15, color: colors.text, fontWeight: '500' }} numberOfLines={2}>
+                      {vm.confirmationAddress || 'Endereço não disponível'}
+                    </ThemedText>
+                  )}
+                </View>
+              </View>
+            </View>
+
+            <View style={{ flexDirection: 'row', gap: 12 }}>
+              <TouchableOpacity
+                style={[styles.buttonCancelar, { flex: 1, marginTop: 0, borderColor: colors.border, backgroundColor: isDark ? 'transparent' : '#F8FAFC' }]}
+                onPress={vm.cancelarPin}
+              >
+                <ThemedText style={[styles.buttonCancelarText, { color: colors.text }]}>Cancelar</ThemedText>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[styles.button, styles.buttonConfirmar, { flex: 1, backgroundColor: colors.tint }]}
+                onPress={vm.confirmarLocalAbrirForm}
+                disabled={vm.loadingConfirmationAddress}
+              >
                 <ThemedText
                   style={[styles.buttonText, { color: isDark ? colors.background : '#fff' }]}
-                  numberOfLines={2}
                 >
-                  Confirmar: {vm.confirmationAddress || 'Carregando endereço...'}
+                  Confirmar
                 </ThemedText>
-              )}
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.buttonCancelar, { borderColor: colors.border }]}
-              onPress={vm.cancelarPin}
-            >
-              <ThemedText style={styles.buttonCancelarText}>Cancelar</ThemedText>
-            </TouchableOpacity>
-          </>
+              </TouchableOpacity>
+            </View>
+          </View>
         ) : (
           <>
             <TouchableOpacity
@@ -508,12 +524,20 @@ const styles = StyleSheet.create({
   },
   bottomCard: {
     position: 'absolute',
-    bottom: 16,
-    left: 16,
-    right: 16,
-    padding: 16,
-    borderRadius: 24,
+    bottom: 24,
+    left: 20,
+    right: 20,
+    padding: 20,
+    borderRadius: 28,
     zIndex: 5,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#EAF0F6',
+    shadowColor: '#0A7EA4',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+    elevation: 6,
   },
   drawingControls: {
     gap: 8,
@@ -558,51 +582,61 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingVertical: 14,
     paddingHorizontal: 20,
-    borderRadius: 999, // Pill shape
+    borderRadius: 16, // Modern shape
   },
   buttonConfirmar: {
     flex: 1,
-    minHeight: 52,
+    minHeight: 56,
+    borderRadius: 16,
+    shadowColor: '#0A7EA4',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
   },
   buttonCancelar: {
     paddingVertical: 14,
     paddingHorizontal: 20,
-    borderRadius: 999, // Pill shape
+    borderRadius: 16,
     borderWidth: 1,
-    marginTop: 10,
+    borderColor: '#EAF0F6',
+    backgroundColor: '#F8FAFC',
+    marginTop: 12,
     alignItems: 'center',
   },
   buttonCancelarText: {
     fontSize: 16,
     fontWeight: '600',
+    color: '#475569',
   },
   buttonText: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   hint: {
-    marginTop: 10,
-    fontSize: 12,
-    opacity: 0.8,
+    marginTop: 12,
+    fontSize: 13,
+    color: '#64748B',
     textAlign: 'center',
   },
   modalOverlay: {
     flex: 1,
     justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    backgroundColor: 'rgba(15, 23, 42, 0.6)',
   },
   modalContent: {
     borderTopLeftRadius: 32,
     borderTopRightRadius: 32,
     maxHeight: '90%',
-    paddingTop: 8, // extra room for a potential handle indicator
+    paddingTop: 8,
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 16,
+    padding: 20,
     borderBottomWidth: 1,
+    borderBottomColor: '#EAF0F6',
   },
   form: {
     padding: 16,

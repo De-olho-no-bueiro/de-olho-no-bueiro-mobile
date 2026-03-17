@@ -1,5 +1,5 @@
-import { ConfiguracoesScreen } from '@/features/configuracoes/views/ConfiguracoesScreen';
+import { ProfileScreen } from '@/features/configuracoes/views/ProfileScreen';
 
-export default function Configuracoes() {
-  return <ConfiguracoesScreen />;
+export default function Perfil() {
+  return <ProfileScreen />;
 }
