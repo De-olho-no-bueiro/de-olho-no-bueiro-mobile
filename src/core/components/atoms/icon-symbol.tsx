@@ -26,6 +26,7 @@ const MAPPING: any = {
   'square.and.arrow.up': 'share',
   'ellipsis': 'more-horiz',
   'gearshape.fill': 'settings',
+  'person.crop.circle.fill': 'person',
   'map': 'map',
   'exclamationmark.triangle': 'warning',
   'clock': 'schedule',

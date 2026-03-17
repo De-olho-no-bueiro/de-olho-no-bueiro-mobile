@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 
 import { ThemedText } from '@/core/components/atoms/themed-text';
 import { ThemedView } from '@/core/components/atoms/themed-view';
@@ -70,6 +71,7 @@ export function MapScreen() {
   const colors = Colors[colorScheme ?? 'light'];
   const isDark = colorScheme === 'dark';
   const insets = useSafeAreaInsets();
+  const router = useRouter();
 
   const vm = useMapViewModel();
 
@@ -166,6 +168,7 @@ export function MapScreen() {
         mapRef={vm.mapRef}
         region={vm.mapRegion}
         onPress={vm.aoClicarNoMapa}
+        onCalloutPress={(id, tipo) => router.push({ pathname: '/(tabs)/report/[id]' as any, params: { id, tipo } })}
         savedReportes={vm.getFilteredReportes()}
         savedManholes={vm.savedManholes}
         savedFloodAreas={vm.savedFloodAreas}
@@ -358,18 +361,34 @@ export function MapScreen() {
               <TouchableOpacity
                 style={[
                   styles.fotoButton,
-                  { borderColor: colors.border, backgroundColor: colors.surface, marginBottom: vm.midiasUri.length > 0 ? 12 : 24 },
+                  { 
+                    borderColor: colors.border, 
+                    backgroundColor: colors.surface, 
+                    marginBottom: vm.midiasUri.length > 0 ? 12 : 24,
+                    opacity: vm.midiasUri.length >= 6 ? 0.5 : 1
+                  },
                 ]}
                 onPress={vm.escolherFoto}
+                disabled={vm.midiasUri.length >= 6}
               >
                   <IconSymbol name="camera.fill" size={32} color={colors.icon} />
-                  <ThemedText style={styles.fotoLabel}>Anexar foto ou vídeo</ThemedText>
+                  <ThemedText style={styles.fotoLabel}>
+                    {vm.midiasUri.length >= 6 ? 'Limite de 6 mídias atingido' : 'Anexar foto ou vídeo'}
+                  </ThemedText>
               </TouchableOpacity>
 
               {vm.midiasUri.length > 0 && (
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 24 }}>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 24 }} contentContainerStyle={{ gap: 8 }}>
                   {vm.midiasUri.map((uri, idx) => (
-                    <Image key={idx} source={{ uri }} style={[styles.fotoPreview, { width: 120, marginRight: 8 }]} />
+                    <View key={`media_${idx}`} style={styles.thumbnailContainer}>
+                      <Image source={{ uri }} style={styles.fotoPreview} />
+                      <TouchableOpacity 
+                        style={styles.thumbnailRemoveButton} 
+                        onPress={() => vm.removerFoto(idx)}
+                      >
+                        <IconSymbol name="xmark" size={14} color="#FFF" />
+                      </TouchableOpacity>
+                    </View>
                   ))}
                 </ScrollView>
               )}
@@ -632,6 +651,31 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
     borderRadius: 10,
+  },
+  thumbnailContainer: {
+    width: 100,
+    height: 100,
+    borderRadius: 10,
+    position: 'relative',
+    overflow: 'visible',
+  },
+  thumbnailRemoveButton: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    backgroundColor: '#FF3B30',
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#FFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 4,
   },
   fotoLabel: {
     marginTop: 6,

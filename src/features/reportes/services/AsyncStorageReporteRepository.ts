@@ -15,7 +15,8 @@ export class AsyncStorageReporteRepository implements IReporteRepository {
     const raw = await AsyncStorage.getItem(STORAGE_KEY);
     if (!raw) return [];
     try {
-      return JSON.parse(raw) as Reporte[];
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
     } catch {
       return [];
     }
@@ -35,7 +36,8 @@ export class AsyncStorageReporteRepository implements IReporteRepository {
     const raw = await AsyncStorage.getItem(MANHOLES_KEY);
     if (!raw) return [];
     try {
-      return JSON.parse(raw) as Manhole[];
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
     } catch {
       return [];
     }
@@ -55,7 +57,8 @@ export class AsyncStorageReporteRepository implements IReporteRepository {
     const raw = await AsyncStorage.getItem(FLOOD_AREAS_KEY);
     if (!raw) return [];
     try {
-      return JSON.parse(raw) as FloodArea[];
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
     } catch {
       return [];
     }

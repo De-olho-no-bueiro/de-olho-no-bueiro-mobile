@@ -332,22 +332,39 @@ export function useMapViewModel() {
   }, []);
 
   const escolherDaGaleria = useCallback(async () => {
+    if (midiasUri.length >= 6) {
+      Alert.alert('Limite atingido', 'Você pode adicionar no máximo 6 fotos/vídeos.');
+      return;
+    }
+
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
       Alert.alert('Permissão', 'Precisamos de acesso às fotos para anexar ao reporte.');
       return;
     }
+
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images', 'videos'],
       allowsMultipleSelection: true,
+      selectionLimit: 6 - midiasUri.length,
       quality: 0.8,
     });
+
     if (!result.canceled) {
-      setMidiasUri(prev => [...prev, ...result.assets.map(a => a.uri)]);
+      setMidiasUri(prev => {
+        const remainingSlots = 6 - prev.length;
+        const newUris = result.assets.slice(0, remainingSlots).map(a => a.uri);
+        return [...prev, ...newUris];
+      });
     }
-  }, []);
+  }, [midiasUri.length]);
 
   const tirarFoto = useCallback(async () => {
+    if (midiasUri.length >= 6) {
+      Alert.alert('Limite atingido', 'Você pode adicionar no máximo 6 fotos/vídeos.');
+      return;
+    }
+
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== 'granted') {
       Alert.alert('Permissão', 'Precisamos de acesso à câmera para tirar a foto.');
@@ -357,7 +374,17 @@ export function useMapViewModel() {
       mediaTypes: ['images', 'videos'],
       quality: 0.8,
     });
-    if (!result.canceled) setMidiasUri(prev => [...prev, result.assets[0].uri]);
+
+    if (!result.canceled && result.assets && result.assets.length > 0) {
+      setMidiasUri(prev => {
+        if (prev.length >= 6) return prev;
+        return [...prev, result.assets[0].uri];
+      });
+    }
+  }, [midiasUri.length]);
+
+  const removerFoto = useCallback((indexToRemove: number) => {
+    setMidiasUri(prev => prev.filter((_, index) => index !== indexToRemove));
   }, []);
 
   const escolherFoto = useCallback(() => {
@@ -446,9 +473,13 @@ export function useMapViewModel() {
       setModalVisible(false);
       setSelectedPoint(null);
       setConfirmationAddress('');
-      Alert.alert('Salvo', isDrawing ? 'Área registrada com sucesso.' : 'Reporte registrado no seu celular.');
+      setTimeout(() => {
+        Alert.alert('Salvo', isDrawing ? 'Área registrada com sucesso.' : 'Reporte registrado no seu celular.');
+      }, 500);
     } catch {
-      Alert.alert('Erro', 'Não foi possível salvar o reporte.');
+      setTimeout(() => {
+        Alert.alert('Erro', 'Não foi possível salvar o reporte.');
+      }, 500);
     } finally {
       setSalvando(false);
     }
@@ -515,6 +546,7 @@ export function useMapViewModel() {
     toggleDrawingMode,
     desfazerUltimoPonto,
     escolherFoto,
+    removerFoto,
     salvar,
     fecharModal,
   };

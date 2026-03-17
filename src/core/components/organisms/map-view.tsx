@@ -1,6 +1,8 @@
+import React from 'react';
 import { Platform, View, StyleSheet } from 'react-native';
-import MapView, { Marker, Polygon } from 'react-native-maps';
+import MapView, { Marker, Polygon, Callout } from 'react-native-maps';
 import { Text } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import type { TipoReporte, NivelAlagamento, Manhole, FloodArea } from '@/features/reportes/models/Reporte';
 
 export type Region = {
@@ -14,6 +16,7 @@ interface MapViewComponentProps {
   mapRef: React.RefObject<MapView>;
   region?: Region;
   onPress: (e: { nativeEvent: { coordinate: { latitude: number; longitude: number } } }) => void;
+  onCalloutPress?: (id: string, tipo: TipoReporte) => void;
   savedReportes: Array<{
     id: string;
     tipo: TipoReporte;
@@ -42,6 +45,7 @@ export default function MapViewComponent({
   mapRef,
   region,
   onPress,
+  onCalloutPress,
   savedReportes,
   savedManholes,
   savedFloodAreas,
@@ -64,41 +68,95 @@ export default function MapViewComponent({
         <Marker
           key={`report_${r.id}`}
           coordinate={{ latitude: r.latitude, longitude: r.longitude }}
-          title={r.tipo === 'alagamento' ? 'Alagamento' : 'Bueiro'}
-          description={r.endereco}
           pinColor={tintColor || colors.tint}
-        />
+        >
+          <Callout onPress={() => onCalloutPress?.(r.id, r.tipo)} tooltip={true}>
+            <View style={styles.calloutWrapper}>
+              <View style={styles.calloutBubble}>
+                <View style={styles.calloutHeader}>
+                  <View style={[styles.calloutIconWrapper, { backgroundColor: r.tipo === 'alagamento' ? '#E8F0FE' : '#FFF3E0' }]}>
+                    <Ionicons name={r.tipo === 'alagamento' ? 'water' : 'warning'} size={18} color={r.tipo === 'alagamento' ? '#1A73E8' : '#F57C00'} />
+                  </View>
+                  <Text style={styles.calloutTitle}>{r.tipo === 'alagamento' ? 'Alagamento' : 'Bueiro'}</Text>
+                </View>
+                <Text style={styles.calloutDesc} numberOfLines={2}>{r.endereco}</Text>
+                <View style={styles.calloutButton}>
+                  <Text style={styles.calloutButtonText}>Veja mais</Text>
+                </View>
+              </View>
+              <View style={styles.calloutArrow} />
+            </View>
+          </Callout>
+        </Marker>
       ))}
 
       {savedManholes.map((m) => (
         <Marker
           key={`manhole_${m.id}`}
           coordinate={{ latitude: m.latitude, longitude: m.longitude }}
-          title="Bueiro"
-          description={m.descricao}
+          tracksViewChanges={false}
           onPress={(e) => { e.stopPropagation(); }}
         >
-          <View style={styles.wazePinContainer}>
-            <View style={styles.wazePinIndicator}>
-              <Text style={styles.wazePinEmoji}>🚧</Text>
-            </View>
-            <View style={styles.wazePinTail} />
+          <View style={styles.customMarkerContainer}>
+            <View style={styles.customMarkerHalo} />
+            <View style={styles.customMarkerCore} />
           </View>
+          <Callout onPress={() => onCalloutPress?.(m.id, 'bueiro')} tooltip={true}>
+            <View style={styles.calloutWrapper}>
+              <View style={styles.calloutBubble}>
+                <View style={styles.calloutHeader}>
+                  <View style={[styles.calloutIconWrapper, { backgroundColor: '#FFF3E0' }]}>
+                    <Ionicons name="warning" size={18} color="#F57C00" />
+                  </View>
+                  <Text style={styles.calloutTitle}>Bueiro Danificado</Text>
+                </View>
+                <Text style={styles.calloutDesc} numberOfLines={2}>{m.descricao || 'Sem descrição'}</Text>
+                <View style={styles.calloutButton}>
+                  <Text style={styles.calloutButtonText}>Veja mais</Text>
+                </View>
+              </View>
+              <View style={styles.calloutArrow} />
+            </View>
+          </Callout>
         </Marker>
       ))}
 
       {savedFloodAreas.map((fa) => {
         const { fill, stroke } = getPolygonColors(fa.nivel);
+        // Calculate an approximate centroid for the marker
+        const lat = fa.coordinates.reduce((acc, c) => acc + c.latitude, 0) / fa.coordinates.length;
+        const lon = fa.coordinates.reduce((acc, c) => acc + c.longitude, 0) / fa.coordinates.length;
         return (
-          <Polygon
-            key={`flood_${fa.id}`}
-            coordinates={fa.coordinates}
-            fillColor={fill}
-            strokeColor={stroke}
-            strokeWidth={2}
-            tappable
-            onPress={(e) => { e.stopPropagation(); }}
-          />
+          <React.Fragment key={`flood_${fa.id}`}>
+            <Polygon
+              coordinates={fa.coordinates}
+              fillColor={fill}
+              strokeColor={stroke}
+              strokeWidth={2}
+              tappable
+              onPress={(e) => { e.stopPropagation(); }}
+            />
+            {/* Invisible marker just to hold the Callout on top of the polygon */}
+            <Marker coordinate={{ latitude: lat, longitude: lon }} opacity={0} onPress={(e) => e.stopPropagation()} tracksViewChanges={false}>
+              <Callout onPress={() => onCalloutPress?.(fa.id, 'alagamento')} tooltip={true}>
+                <View style={styles.calloutWrapper}>
+                  <View style={styles.calloutBubble}>
+                    <View style={styles.calloutHeader}>
+                      <View style={[styles.calloutIconWrapper, { backgroundColor: '#FFEBEE' }]}>
+                        <Ionicons name="water" size={18} color="#D32F2F" />
+                      </View>
+                      <Text style={styles.calloutTitle}>Área de Alagamento</Text>
+                    </View>
+                    <Text style={styles.calloutDesc} numberOfLines={2}>{fa.descricao || 'Sem descrição'}</Text>
+                    <View style={styles.calloutButton}>
+                      <Text style={styles.calloutButtonText}>Veja mais</Text>
+                    </View>
+                  </View>
+                  <View style={styles.calloutArrow} />
+                </View>
+              </Callout>
+            </Marker>
+          </React.Fragment>
         );
       })}
 
@@ -116,6 +174,7 @@ export default function MapViewComponent({
           coordinate={coord} 
           pinColor="blue" 
           title={`Ponto ${index + 1}`} 
+          tracksViewChanges={false}
         />
       ))}
 
@@ -123,12 +182,11 @@ export default function MapViewComponent({
         <Marker
           coordinate={selectedPoint}
           title="Novo ponto"
+          // Let it track changes initially if it animates, but usually it's static
         >
-          <View style={styles.wazePinContainer}>
-            <View style={[styles.wazePinIndicator, { backgroundColor: '#FF3B30', borderColor: '#FFF' }]}>
-              <Text style={styles.wazePinEmoji}>➕</Text>
-            </View>
-            <View style={[styles.wazePinTail, { borderTopColor: '#FF3B30' }]} />
+          <View style={styles.customMarkerContainer}>
+            <View style={[styles.customMarkerHalo, { backgroundColor: 'rgba(255, 59, 48, 0.25)' }]} />
+            <View style={[styles.customMarkerCore, { backgroundColor: '#FF3B30' }]} />
           </View>
         </Marker>
       )}
@@ -141,43 +199,91 @@ const styles = StyleSheet.create({
     flex: 1,
     width: '100%',
   },
-  wazePinContainer: {
+  customMarkerContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    width: 44,
-    height: 50,
+    width: 30,
+    height: 30,
   },
-  wazePinIndicator: {
-    backgroundColor: '#FF9500',
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
+  customMarkerHalo: {
+    position: 'absolute',
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 149, 0, 0.25)', // Laranja translúcido
+  },
+  customMarkerCore: {
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: '#FF9500', // Laranja sólido
     borderWidth: 2,
     borderColor: '#FFFFFF',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.3,
-    shadowRadius: 3,
-    elevation: 5,
-    zIndex: 2,
+    shadowRadius: 1.5,
+    elevation: 3,
   },
-  wazePinEmoji: {
+  calloutWrapper: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 260,
+  },
+  calloutBubble: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 16,
+    width: '100%',
+    shadowColor: '#000',
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 6,
+  },
+  calloutHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  calloutIconWrapper: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  calloutTitle: {
+    fontWeight: '800',
     fontSize: 16,
+    color: '#333',
+    flex: 1,
   },
-  wazePinTail: {
-    width: 0,
-    height: 0,
+  calloutDesc: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 16,
+    lineHeight: 20,
+  },
+  calloutButton: {
+    backgroundColor: '#007AFF', // Waze-like Blue
+    borderRadius: 24,
+    paddingVertical: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  calloutButtonText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 15,
+  },
+  calloutArrow: {
     backgroundColor: 'transparent',
-    borderStyle: 'solid',
-    borderLeftWidth: 6,
-    borderRightWidth: 6,
-    borderTopWidth: 8,
-    borderLeftColor: 'transparent',
-    borderRightColor: 'transparent',
-    borderTopColor: '#FF9500',
+    borderColor: 'transparent',
+    borderTopColor: '#fff',
+    borderWidth: 16,
+    alignSelf: 'center',
     marginTop: -2,
-    zIndex: 1,
   }
 });
