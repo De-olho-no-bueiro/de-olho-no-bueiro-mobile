@@ -312,7 +312,9 @@ export function MapScreen() {
               style={styles.buttonCancelar}
               onPress={vm.toggleDrawingMode}
             >
-              <ThemedText>Cancelar Desenho</ThemedText>
+              <ThemedText style={styles.buttonCancelarText}>
+                Cancelar Desenho
+              </ThemedText>
             </TouchableOpacity>
           </View>
         ) : vm.selectedPoint && !vm.modalVisible ? (
