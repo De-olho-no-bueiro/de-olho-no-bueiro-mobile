@@ -1,4 +1,5 @@
 import { useRouter } from "expo-router";
+import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -80,6 +81,37 @@ export function MapScreen() {
   const router = useRouter();
 
   const vm = useMapViewModel();
+
+  const [tipoAlerta, setTipoAlerta] = useState<
+    "idle" | "choosing" | "enchente" | "bueiro"
+  >("idle");
+
+  const handleMapPress = useCallback(
+    (e: any) => {
+      if (vm.isDrawing) {
+        vm.aoClicarNoMapa(e);
+        return;
+      }
+      if (tipoAlerta === "bueiro") {
+        vm.aoClicarNoMapa(e);
+      }
+    },
+    [vm.isDrawing, vm.aoClicarNoMapa, tipoAlerta],
+  );
+
+  const handleCancelarPin = useCallback(() => {
+    vm.cancelarPin();
+  }, [vm.cancelarPin]);
+
+  const handleFecharModal = useCallback(() => {
+    vm.fecharModal();
+    setTipoAlerta("idle");
+  }, [vm.fecharModal]);
+
+  const handleCancelarDesenho = useCallback(() => {
+    vm.toggleDrawingMode();
+    setTipoAlerta("enchente");
+  }, [vm.toggleDrawingMode]);
 
   const loadingOverlayBg = isDark
     ? "rgba(0,0,0,0.75)"
@@ -226,7 +258,7 @@ export function MapScreen() {
       <MapViewComponent
         mapRef={vm.mapRef}
         region={vm.mapRegion}
-        onPress={vm.aoClicarNoMapa}
+        onPress={handleMapPress}
         onCalloutPress={(id, tipo) =>
           router.push({
             pathname: "/(tabs)/report/[id]" as any,
@@ -266,8 +298,8 @@ export function MapScreen() {
         {vm.isDrawing ? (
           <View style={styles.drawingControls}>
             <ThemedText style={styles.drawingHint}>
-              Modo Desenho ({vm.drawingCoordinates.length} pt). Demarque a área
-              no mapa e confirme.
+              Modo Desenho ({vm.drawingCoordinates.length} pt). Escolha no
+              mínimo 3 pontos no mapa e confirme.
             </ThemedText>
 
             <View style={{ flexDirection: "row", gap: 8, marginTop: 8 }}>
@@ -310,7 +342,7 @@ export function MapScreen() {
             </View>
             <TouchableOpacity
               style={styles.buttonCancelar}
-              onPress={vm.toggleDrawingMode}
+              onPress={handleCancelarDesenho}
             >
               <ThemedText style={styles.buttonCancelarText}>
                 Cancelar Desenho
@@ -381,15 +413,11 @@ export function MapScreen() {
                   {
                     flex: 1,
                     marginTop: 0,
-                    borderColor: colors.border,
-                    backgroundColor: isDark ? "transparent" : "#F8FAFC",
                   },
                 ]}
-                onPress={vm.cancelarPin}
+                onPress={handleCancelarPin}
               >
-                <ThemedText
-                  style={[styles.buttonCancelarText, { color: colors.text }]}
-                >
+                <ThemedText style={styles.buttonCancelarText}>
                   Cancelar
                 </ThemedText>
               </TouchableOpacity>
@@ -414,7 +442,71 @@ export function MapScreen() {
               </TouchableOpacity>
             </View>
           </View>
-        ) : (
+        ) : tipoAlerta === "idle" ? (
+          <View style={{ paddingTop: 12 }}>
+            <TouchableOpacity
+              style={[styles.button, { backgroundColor: colors.tint }]}
+              onPress={() => setTipoAlerta("choosing")}
+            >
+              <IconSymbol
+                name="plus"
+                size={22}
+                color={isDark ? colors.background : "#fff"}
+              />
+              <ThemedText
+                style={[
+                  styles.buttonText,
+                  { color: isDark ? colors.background : "#fff" },
+                ]}
+              >
+                Nova Ocorrência
+              </ThemedText>
+            </TouchableOpacity>
+          </View>
+        ) : tipoAlerta === "choosing" ? (
+          <View style={{ gap: 10 }}>
+            <ThemedText style={styles.drawingHint}>
+              Qual tipo de ocorrência?
+            </ThemedText>
+            <TouchableOpacity
+              style={[styles.button, { backgroundColor: "#2C9BF0" }]}
+              onPress={() => {
+                vm.setTipo("alagamento");
+                setTipoAlerta("enchente");
+              }}
+            >
+              <ThemedText style={[styles.buttonText, { color: "#fff" }]}>
+                🌊 Alertar enchente
+              </ThemedText>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.button,
+                {
+                  backgroundColor: colors.background,
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                },
+              ]}
+              onPress={() => {
+                vm.setTipo("bueiro");
+                setTipoAlerta("bueiro");
+              }}
+            >
+              <ThemedText style={{ color: colors.text }}>
+                🕳️ Alertar problema em bueiro
+              </ThemedText>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.buttonCancelar}
+              onPress={() => setTipoAlerta("idle")}
+            >
+              <ThemedText style={styles.buttonCancelarText}>
+                Cancelar
+              </ThemedText>
+            </TouchableOpacity>
+          </View>
+        ) : tipoAlerta === "enchente" ? (
           <>
             <TouchableOpacity
               style={[
@@ -437,7 +529,34 @@ export function MapScreen() {
                 Desenhar Área de Enchente
               </ThemedText>
             </TouchableOpacity>
-
+            <TouchableOpacity
+              style={[styles.button, { backgroundColor: colors.tint }]}
+              onPress={vm.usarMinhaLocalizacao}
+              disabled={vm.loadingLocation}
+            >
+              <IconSymbol
+                name="location.fill"
+                size={22}
+                color={isDark ? colors.background : "#fff"}
+              />
+              <ThemedText
+                style={[
+                  styles.buttonText,
+                  { color: isDark ? colors.background : "#fff" },
+                ]}
+              >
+                Usar minha localização
+              </ThemedText>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.buttonCancelar, { marginTop: 24 }]}
+              onPress={() => setTipoAlerta("choosing")}
+            >
+              <ThemedText style={styles.buttonCancelarText}>Voltar</ThemedText>
+            </TouchableOpacity>
+          </>
+        ) : (
+          <>
             <TouchableOpacity
               style={[styles.button, { backgroundColor: colors.tint }]}
               onPress={vm.usarMinhaLocalizacao}
@@ -461,6 +580,12 @@ export function MapScreen() {
               Ou toque no mapa para colocar um pin (até {vm.RAIO_MAXIMO_KM} km
               de você).
             </ThemedText>
+            <TouchableOpacity
+              style={styles.buttonCancelar}
+              onPress={() => setTipoAlerta("choosing")}
+            >
+              <ThemedText style={styles.buttonCancelarText}>Voltar</ThemedText>
+            </TouchableOpacity>
           </>
         )}
       </View>
@@ -469,7 +594,7 @@ export function MapScreen() {
         visible={vm.modalVisible}
         animationType="slide"
         transparent
-        onRequestClose={vm.fecharModal}
+        onRequestClose={handleFecharModal}
       >
         <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : undefined}
@@ -488,7 +613,7 @@ export function MapScreen() {
               style={[styles.modalHeader, { borderBottomColor: colors.border }]}
             >
               <ThemedText type="subtitle">Novo reporte</ThemedText>
-              <TouchableOpacity onPress={vm.fecharModal}>
+              <TouchableOpacity onPress={handleFecharModal}>
                 <ThemedText type="link">Fechar</ThemedText>
               </TouchableOpacity>
             </View>

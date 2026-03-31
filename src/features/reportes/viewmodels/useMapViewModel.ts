@@ -307,7 +307,6 @@ export function useMapViewModel() {
     if (!selectedPoint || loadingConfirmationAddress) return;
     setEndereco(confirmationAddress || '');
     setLoadingAddress(false);
-    setTipo('bueiro');
     setNivel('baixo');
     setDescricao('');
     setMidiasUri([]);
