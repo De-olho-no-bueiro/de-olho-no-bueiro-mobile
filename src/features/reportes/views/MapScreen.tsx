@@ -266,8 +266,8 @@ export function MapScreen() {
           })
         }
         savedReportes={vm.getFilteredReportes()}
-        savedManholes={vm.savedManholes}
-        savedFloodAreas={vm.savedFloodAreas}
+        savedManholes={vm.getFilteredManholes()}
+        savedFloodAreas={vm.getFilteredFloodAreas()}
         drawingCoordinates={vm.drawingCoordinates}
         selectedPoint={vm.selectedPoint}
         colors={colors}

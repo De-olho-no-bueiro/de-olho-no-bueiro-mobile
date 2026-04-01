@@ -213,9 +213,9 @@ export function useMapViewModel() {
 
   const getFilteredReportes = useCallback(() => {
     let filtered = savedReportes;
-    
+
     if (filtroAtivo === 'mais-graves') {
-      filtered = filtered.filter(r => r.nivel === 'grave');
+      filtered = filtered.filter(r => r.nivel === 'medio' || r.nivel === 'grave');
     } else if (filtroAtivo === 'ultimos-7-dias') {
       const seteDiasAtras = new Date();
       seteDiasAtras.setDate(seteDiasAtras.getDate() - 7);
@@ -223,11 +223,35 @@ export function useMapViewModel() {
     } else if (filtroAtivo === 'alagamentos') {
       filtered = filtered.filter(r => r.tipo === 'alagamento');
     } else if (filtroAtivo === 'bueiros') {
-      filtered = filtered.filter(r => r.tipo === 'bueiro');
+      filtered = [];
     }
-    
+
     return filtered;
   }, [savedReportes, filtroAtivo]);
+
+  const getFilteredManholes = useCallback(() => {
+    if (filtroAtivo === 'alagamentos') return [];
+    if (filtroAtivo === 'mais-graves') return [];
+    if (filtroAtivo === 'ultimos-7-dias') {
+      const seteDiasAtras = new Date();
+      seteDiasAtras.setDate(seteDiasAtras.getDate() - 7);
+      return savedManholes.filter(m => new Date(m.dataHora) >= seteDiasAtras);
+    }
+    return savedManholes;
+  }, [savedManholes, filtroAtivo]);
+
+  const getFilteredFloodAreas = useCallback(() => {
+    if (filtroAtivo === 'bueiros') return [];
+    if (filtroAtivo === 'mais-graves') {
+      return savedFloodAreas.filter(fa => fa.nivel === 'medio' || fa.nivel === 'grave');
+    }
+    if (filtroAtivo === 'ultimos-7-dias') {
+      const seteDiasAtras = new Date();
+      seteDiasAtras.setDate(seteDiasAtras.getDate() - 7);
+      return savedFloodAreas.filter(fa => new Date(fa.dataHora) >= seteDiasAtras);
+    }
+    return savedFloodAreas;
+  }, [savedFloodAreas, filtroAtivo]);
 
   const aoClicarNoMapa = useCallback(
     (e: { nativeEvent: { coordinate?: Coordenadas } }) => {
@@ -537,6 +561,8 @@ export function useMapViewModel() {
     buscarPorEndereco,
     selecionarSugestao,
     getFilteredReportes,
+    getFilteredManholes,
+    getFilteredFloodAreas,
     aoClicarNoMapa,
     usarMinhaLocalizacao,
     confirmarLocalAbrirForm,
