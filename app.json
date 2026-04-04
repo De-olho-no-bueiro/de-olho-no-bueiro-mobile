@@ -58,7 +58,8 @@
           "photosPermission": "O app usa fotos para anexar ao reporte de alagamento ou bueiro.",
           "cameraPermission": "O app precisa da câmera para tirar foto do local."
         }
-      ]
+      ],
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true,

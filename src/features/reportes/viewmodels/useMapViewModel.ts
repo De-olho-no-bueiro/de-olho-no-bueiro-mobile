@@ -4,9 +4,9 @@ import * as Location from 'expo-location';
 import * as ImagePicker from 'expo-image-picker';
 
 import type { Reporte, TipoReporte, NivelAlagamento, Manhole, FloodArea } from '@/features/reportes/models/Reporte';
-import { AsyncStorageReporteRepository } from '@/features/reportes/services/AsyncStorageReporteRepository';
+import { ApiReporteRepository } from '@/features/reportes/services/ApiReporteRepository';
 import { ExpoGeoService } from '@/features/reportes/services/ExpoGeoService';
-const reporteRepository = new AsyncStorageReporteRepository();
+const reporteRepository = new ApiReporteRepository();
 const geoService = new ExpoGeoService();
 
 const RAIO_MAXIMO_KM = geoService.getRaioMaximoPermitidoKm();

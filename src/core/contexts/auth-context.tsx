@@ -1,16 +1,18 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
+import { API_URL } from '../utils/api';
 
 type User = {
   id: string;
   name: string;
   email: string;
+  token?: string; 
 };
 
 type AuthContextType = {
   user: User | null;
   isLoading: boolean;
-  signIn: (email: string, name?: string) => Promise<void>;
+  signIn: (email: string, password?: string) => Promise<void>;
   signUp: (name: string, email: string) => Promise<void>;
   signOut: () => Promise<void>;
 };
@@ -32,10 +34,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Check if user is logged in
     const checkSession = async () => {
       try {
-        const storedUser = await AsyncStorage.getItem('@mock_user');
+        const storedUser = await SecureStore.getItemAsync('userData');
         if (storedUser) {
           setUser(JSON.parse(storedUser));
         }
@@ -48,30 +49,55 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     checkSession();
   }, []);
 
-  const signIn = async (email: string, name?: string) => {
-    // Mock login logic
-    const mockUser: User = {
-      id: `user-${Date.now()}`,
-      name: name || email.split('@')[0],
-      email,
-    };
-    await AsyncStorage.setItem('@mock_user', JSON.stringify(mockUser));
-    setUser(mockUser);
+  const signIn = async (email: string, password?: string) => {
+    try {
+      const resp = await fetch(`${API_URL}/mobile/v1/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password: password || '123' }), // fallback na senha só pra não travar tela se a ui não mandar
+      });
+      if (!resp.ok) {
+        throw new Error('Falha no login');
+      }
+      const data = await resp.json();
+      
+      const loggedUser: User = {
+        id: data.userId || `user-${Date.now()}`,
+        name: data.name || email.split('@')[0],
+        email,
+        token: data.access_token,
+      };
+
+      await SecureStore.setItemAsync('userToken', data.access_token);
+      await SecureStore.setItemAsync('userData', JSON.stringify(loggedUser));
+      setUser(loggedUser);
+    } catch(err) {
+      console.error(err);
+      throw err;
+    }
   };
 
   const signUp = async (name: string, email: string) => {
-    // Mock signup logic
-    const mockUser: User = {
-      id: `user-${Date.now()}`,
-      name,
-      email,
-    };
-    await AsyncStorage.setItem('@mock_user', JSON.stringify(mockUser));
-    setUser(mockUser);
+    try {
+      const resp = await fetch(`${API_URL}/mobile/v1/auth/signup`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email, password: '123' }), // fallback simples, em real a UI deve pegar a senha
+      });
+      if (!resp.ok) {
+        throw new Error('Falha no cadastro');
+      }
+      
+      await signIn(email, '123'); // auto-login
+    } catch(err) {
+      console.error(err);
+      throw err;
+    }
   };
 
   const signOut = async () => {
-    await AsyncStorage.removeItem('@mock_user');
+    await SecureStore.deleteItemAsync('userToken');
+    await SecureStore.deleteItemAsync('userData');
     setUser(null);
   };
 
