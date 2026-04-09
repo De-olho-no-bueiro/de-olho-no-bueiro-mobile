@@ -10,6 +10,8 @@ export interface Reporte {
   nivel: NivelAlagamento;
   descricao: string;
   fotoUri: string | null;
+  midiasUri?: string[]; // Arrays nativos de file://
+  midias?: string[];    // Array temporário carregado de Base64 para envio payload
   dataHora: string;
 }
 
@@ -21,6 +23,7 @@ export interface Manhole {
   dataHora: string;
   is_finished?: boolean;
   midiasUri?: string[];
+  midias?: string[];
 }
 
 export interface FloodArea {
@@ -31,6 +34,7 @@ export interface FloodArea {
   dataHora: string;
   is_finished?: boolean;
   midiasUri?: string[];
+  midias?: string[];
 }
 
 export const TIPO_LABELS: Record<TipoReporte, string> = {

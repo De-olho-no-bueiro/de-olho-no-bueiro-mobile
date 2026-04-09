@@ -56,10 +56,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password: password || '123' }), // fallback na senha só pra não travar tela se a ui não mandar
       });
-      if (!resp.ok) {
-        throw new Error('Falha no login');
-      }
+      
       const data = await resp.json();
+      
+      if (!resp.ok) {
+        throw new Error(data.message || 'Falha no login');
+      }
       
       const loggedUser: User = {
         id: data.userId || `user-${Date.now()}`,
@@ -72,7 +74,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await SecureStore.setItemAsync('userData', JSON.stringify(loggedUser));
       setUser(loggedUser);
     } catch(err) {
-      console.error(err);
+      console.error('Erro no SignIn: ', err);
       throw err;
     }
   };
@@ -84,13 +86,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name, email, password: '123' }), // fallback simples, em real a UI deve pegar a senha
       });
+      
+      const data = await resp.json().catch(() => null);
+
       if (!resp.ok) {
-        throw new Error('Falha no cadastro');
+        throw new Error(data?.message || 'Falha no cadastro');
       }
       
       await signIn(email, '123'); // auto-login
     } catch(err) {
-      console.error(err);
+      console.error('Erro no SignUp: ', err);
       throw err;
     }
   };

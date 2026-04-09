@@ -1,6 +1,29 @@
 import { Reporte, Manhole, FloodArea } from '@/features/reportes/models/Reporte';
 import { IReporteRepository } from './IReporteRepository';
 import { fetchWithAuth } from '@/core/utils/api';
+import { encode as btoa } from 'base-64';
+
+// Helpers para converter os Bytes[] do PostgreSQL Serializados em Base64 p/ usar no source={{uri}}
+// O Prisma retorna um objeto { type: 'Buffer', data: [...] } quando faz um JSON.stringify do Uint8Array
+const parseBufferToDataUrl = (mediaObj: any): string => {
+  if (typeof mediaObj === 'string') {
+    return mediaObj.startsWith('data:') ? mediaObj : `data:image/jpeg;base64,${mediaObj}`;
+  }
+  if (mediaObj && mediaObj.type === 'Buffer' && Array.isArray(mediaObj.data)) {
+    // Reduz os números para char map para btoa - otimizado para chunks pra não crachar o call stack
+    const chunkSize = 8192;
+    let binary = '';
+    for (let i = 0; i < mediaObj.data.length; i += chunkSize) {
+      binary += String.fromCharCode.apply(null, mediaObj.data.slice(i, i + chunkSize));
+    }
+    // Caso não exista btoa global (Expo), usa require na marra ou assume fallback
+    try {
+      const base64 = typeof window !== 'undefined' && window.btoa ? window.btoa(binary) : (global as any).btoa ? (global as any).btoa(binary) : null;
+      if (base64) return `data:image/jpeg;base64,${base64}`;
+    } catch {}
+  }
+  return '';
+};
 
 export class ApiReporteRepository implements IReporteRepository {
   async salvarReportes(reportes: Reporte[]): Promise<void> {
@@ -12,18 +35,21 @@ export class ApiReporteRepository implements IReporteRepository {
       const response = await fetchWithAuth('/mobile/v1/reportes');
       if (!response.ok) return [];
       const data = await response.json();
-      // O DB usa campos type/nivel/latitude, o mobile usa o Reporte
-      return data.map((d: any) => ({
-        id: d.id.toString(),
-        tipo: d.type || 'alagamento',
-        latitude: d.latitude,
-        longitude: d.longitude,
-        endereco: d.endereco || 'Endereço não informado',
-        nivel: d.nivel || 'baixo',
-        descricao: d.content || '',
-        fotoUri: null, // Mapeamento de mídia omitido para simplificação.
-        dataHora: d.createdAt,
-      }));
+      return data.map((d: any) => {
+        const midiasUri = d.medias && Array.isArray(d.medias) ? d.medias.map(parseBufferToDataUrl).filter(Boolean) : [];
+        return {
+          id: d.id.toString(),
+          tipo: d.type || 'alagamento',
+          latitude: d.latitude,
+          longitude: d.longitude,
+          endereco: d.endereco || 'Endereço não informado',
+          nivel: d.nivel || 'baixo',
+          descricao: d.content || '',
+          fotoUri: midiasUri[0] || null, // A primeira foto é usada como thumb legado
+          midiasUri, // Para detalhes ou carousel
+          dataHora: d.createdAt,
+        };
+      });
     } catch {
       return [];
     }
@@ -44,15 +70,18 @@ export class ApiReporteRepository implements IReporteRepository {
       const response = await fetchWithAuth('/mobile/v1/manholes');
       if (!response.ok) return [];
       const data = await response.json();
-      return data.map((d: any) => ({
-        id: d.id.toString(),
-        latitude: d.latitude,
-        longitude: d.longitude,
-        descricao: d.name,
-        dataHora: d.createdAt,
-        is_finished: false,
-        midiasUri: [],
-      }));
+      return data.map((d: any) => {
+        const midiasParsed = d.medias && Array.isArray(d.medias) ? d.medias.map(parseBufferToDataUrl).filter(Boolean) : [];
+        return {
+          id: d.id.toString(),
+          latitude: d.latitude,
+          longitude: d.longitude,
+          descricao: d.name,
+          dataHora: d.createdAt,
+          is_finished: false,
+          midiasUri: midiasParsed,
+        };
+      });
     } catch {
       return [];
     }
@@ -79,6 +108,7 @@ export class ApiReporteRepository implements IReporteRepository {
           latitude: lat,
           longitude: d.longitude[idx],
         }));
+        const midiasParsed = d.medias && Array.isArray(d.medias) ? d.medias.map(parseBufferToDataUrl).filter(Boolean) : [];
         return {
           id: d.id.toString(),
           coordinates,
@@ -86,7 +116,7 @@ export class ApiReporteRepository implements IReporteRepository {
           descricao: d.name,
           dataHora: d.createdAt,
           is_finished: false,
-          midiasUri: [],
+          midiasUri: midiasParsed,
         };
       });
     } catch {

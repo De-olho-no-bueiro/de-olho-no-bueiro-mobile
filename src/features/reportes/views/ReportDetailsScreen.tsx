@@ -29,10 +29,10 @@ export function ReportDetailsScreen() {
   const vm = useReportDetailsViewModel();
   const [newComment, setNewComment] = useState('');
 
-  const handleSendComment = () => {
+  const handleSendComment = async () => {
     if (!newComment.trim()) return;
     Keyboard.dismiss();
-    // Integração futura via ViewModel
+    await vm.enviarComentario(newComment.trim());
     setNewComment('');
   };
 
@@ -74,7 +74,7 @@ export function ReportDetailsScreen() {
           {hasImages ? (
             <View style={styles.carouselContainer}>
               <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false} style={styles.carousel}>
-                {(data.midiasUri || [data.fotoUri]).map((uri, index) => (
+                {(data.midiasUri || [data.fotoUri]).map((uri: string, index: number) => (
                   <View key={index} style={styles.carouselImageWrapper}>
                     <Image source={{ uri }} style={styles.carouselImage} contentFit="cover" />
                   </View>
@@ -155,20 +155,25 @@ export function ReportDetailsScreen() {
                     Nenhum comentário por enquanto. Seja o primeiro!
                   </ThemedText>
                 ) : (
-                  comments.map((c, idx) => (
-                    <View key={c.id} style={styles.commentItem}>
-                      <View style={styles.avatar}>
-                        <IconSymbol name="person.fill" size={18} color="#fff" />
-                      </View>
-                      <View style={[styles.commentBubble, { backgroundColor: isDark ? '#333' : '#F8FAFC' }]}>
-                        <View style={styles.commentHeader}>
-                          <ThemedText style={styles.commentName}>{c.user}</ThemedText>
-                          <ThemedText style={[styles.commentTime, { color: colors.icon }]}>{c.time}</ThemedText>
+                  comments.map((c) => {
+                    const authorName = c.author?.name || 'Usuário';
+                    const initial = authorName.charAt(0).toUpperCase();
+                    const timeStr = new Date(c.createdAt).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+                    return (
+                      <View key={c.id} style={styles.commentItem}>
+                        <View style={[styles.avatar, { backgroundColor: '#1A73E8' }]}>
+                          <ThemedText style={{ color: '#FFF', fontWeight: 'bold' }}>{initial}</ThemedText>
                         </View>
-                        <ThemedText style={[styles.commentText, { color: colors.text }]}>{c.text}</ThemedText>
+                        <View style={[styles.commentBubble, { backgroundColor: isDark ? '#333' : '#F8FAFC' }]}>
+                          <View style={styles.commentHeader}>
+                            <ThemedText style={styles.commentName}>{authorName}</ThemedText>
+                            <ThemedText style={[styles.commentTime, { color: colors.icon }]}>{timeStr}</ThemedText>
+                          </View>
+                          <ThemedText style={[styles.commentText, { color: colors.text }]}>{c.content}</ThemedText>
+                        </View>
                       </View>
-                    </View>
-                  ))
+                    );
+                  })
                 )}
               </View>
             </View>

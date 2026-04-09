@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, useRef } from 'react';
 import { Alert } from 'react-native';
 import * as Location from 'expo-location';
 import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system';
 
 import type { Reporte, TipoReporte, NivelAlagamento, Manhole, FloodArea } from '@/features/reportes/models/Reporte';
 import { ApiReporteRepository } from '@/features/reportes/services/ApiReporteRepository';
@@ -448,6 +449,14 @@ export function useMapViewModel() {
   const salvar = useCallback(async () => {
     setSalvando(true);
     try {
+      // 1. Processar mídias nativas (URI) para strings Base64
+      let midiasProcessed: string[] = [];
+      if (midiasUri && midiasUri.length > 0) {
+        midiasProcessed = await Promise.all(
+          midiasUri.map(async (uri) => await FileSystem.readAsStringAsync(uri, { encoding: 'base64' }))
+        );
+      }
+
       if (isDrawing) {
         const floodArea: FloodArea = {
           id: `flood-${Date.now()}-${Math.random().toString(36).slice(2)}`,
@@ -457,6 +466,7 @@ export function useMapViewModel() {
           dataHora: new Date().toISOString(),
           is_finished: false,
           midiasUri,
+          midias: midiasProcessed,
         };
         await reporteRepository.adicionarFloodArea(floodArea);
         const atualizados = await reporteRepository.carregarFloodAreas();
@@ -473,6 +483,8 @@ export function useMapViewModel() {
           nivel,
           descricao: descricao.trim() || '',
           fotoUri: midiasUri[0] || null,
+          midiasUri,
+          midias: midiasProcessed,
           dataHora: new Date().toISOString(),
         };
         await reporteRepository.adicionarReporte(reporte);
@@ -487,6 +499,7 @@ export function useMapViewModel() {
            dataHora: new Date().toISOString(),
            is_finished: false,
            midiasUri,
+           midias: midiasProcessed,
          };
          await reporteRepository.adicionarManhole(manhole);
          const atualizados = await reporteRepository.carregarManholes();

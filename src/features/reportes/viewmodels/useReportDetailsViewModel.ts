@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useLocalSearchParams } from 'expo-router';
 import { AsyncStorageReporteRepository } from '@/features/reportes/services/AsyncStorageReporteRepository';
+import { ApiCommentRepository, Comment } from '@/features/reportes/services/ApiCommentRepository';
 
 export function useReportDetailsViewModel() {
   const params = useLocalSearchParams();
@@ -9,10 +10,8 @@ export function useReportDetailsViewModel() {
 
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<any>(null);
-  const [comments, setComments] = useState([
-    { id: '1', user: 'Ana P.', text: 'Isso está um perigo! Quase caí aí ontem.', time: '2h atrás' },
-    { id: '2', user: 'Carlos M.', text: 'A prefeitura precisa vir arrumar. Marquei aqui também pra dar força.', time: '5h atrás' },
-  ]); // Mocked comments
+  const [comments, setComments] = useState<Comment[]>([]);
+  const commentRepo = new ApiCommentRepository();
 
   useEffect(() => {
     async function loadData() {
@@ -41,8 +40,23 @@ export function useReportDetailsViewModel() {
       }
     }
     
+    async function loadComments() {
+      if (!id) return;
+      const apiComments = await commentRepo.getComments(id);
+      setComments(apiComments);
+    }
+    
     loadData();
+    loadComments();
   }, [id, tipo]);
+
+  const enviarComentario = async (text: string) => {
+    if (!id || !text) return;
+    const newComment = await commentRepo.addComment(id, text);
+    if (newComment) {
+      setComments((prev) => [...prev, newComment]);
+    }
+  };
 
   return {
     id,
@@ -50,5 +64,6 @@ export function useReportDetailsViewModel() {
     loading,
     data,
     comments,
+    enviarComentario,
   };
 }
