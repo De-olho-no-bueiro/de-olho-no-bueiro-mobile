@@ -13,7 +13,7 @@ type AuthContextType = {
   user: User | null;
   isLoading: boolean;
   signIn: (email: string, password?: string) => Promise<void>;
-  signUp: (name: string, email: string) => Promise<void>;
+  signUp: (name: string, email: string, password?: string) => Promise<void>;
   signOut: () => Promise<void>;
 };
 
@@ -79,12 +79,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const signUp = async (name: string, email: string) => {
+  const signUp = async (name: string, email: string, password?: string) => {
     try {
       const resp = await fetch(`${API_URL}/mobile/v1/auth/signup`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, password: '123' }), // fallback simples, em real a UI deve pegar a senha
+        body: JSON.stringify({ name, email, password: password || '123' }),
       });
       
       const data = await resp.json().catch(() => null);
@@ -93,7 +93,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         throw new Error(data?.message || 'Falha no cadastro');
       }
       
-      await signIn(email, '123'); // auto-login
+      await signIn(email, password || '123'); // auto-login
     } catch(err) {
       console.error('Erro no SignUp: ', err);
       throw err;

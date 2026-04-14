@@ -26,7 +26,10 @@ export function useReportDetailsViewModel() {
         } else if (tipo === 'alagamento') {
           const areas = await repo.carregarFloodAreas();
           found = areas.find((a) => a.id === id);
-        } else {
+        }
+
+        // Fallback genérico: se for um marcador de alagamento pontual (não polígono) ou tipo não mapeado
+        if (!found) {
            const reportes = await repo.carregarReportes();
            found = reportes.find((r) => r.id === id);
         }

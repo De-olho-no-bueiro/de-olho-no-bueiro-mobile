@@ -20,7 +20,7 @@ export function useAuthViewModel() {
     }
     setIsSubmitting(true);
     try {
-      await signIn(email, 'Usuário (Mock)');
+      await signIn(email, password);
     } catch (error) {
        Alert.alert('Erro', 'Falha ao logar.');
     } finally {
@@ -39,7 +39,7 @@ export function useAuthViewModel() {
     }
     setIsSubmitting(true);
     try {
-      await signUp(name, email);
+      await signUp(name, email, password);
     } catch (error) {
        Alert.alert('Erro', 'Falha ao cadastrar.');
     } finally {

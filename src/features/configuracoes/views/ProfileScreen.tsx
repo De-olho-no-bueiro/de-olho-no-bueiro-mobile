@@ -13,6 +13,7 @@ import { ThemedView } from '@/core/components/atoms/themed-view';
 import { IconSymbol } from '@/core/components/atoms/icon-symbol';
 import { useColorScheme } from '@/core/hooks/use-color-scheme';
 import { Colors } from '@/core/constants/theme';
+import { useAuth } from '@/core/contexts/auth-context';
 
 export function ProfileScreen() {
   const insets = useSafeAreaInsets();
@@ -21,11 +22,21 @@ export function ProfileScreen() {
   const router = useRouter();
   
   const isDark = colorScheme === 'dark';
+  const { user, signOut } = useAuth();
 
-  const user = {
-    name: 'João Cidadão',
-    email: 'joao.cidadao@exemplo.com',
-    avatar: 'https://i.pravatar.cc/150?u=joao'
+  const getInitials = (name: string) => {
+    if (!name || name === 'Usuário') return '?';
+    const parts = name.trim().split(' ');
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[1][0]).toUpperCase();
+    }
+    return name.substring(0, 2).toUpperCase();
+  };
+
+  const displayUser = {
+    name: user?.name || 'Usuário',
+    email: user?.email || '',
+    avatar: 'https://i.pravatar.cc/150?u=' + (user?.name || 'user')
   };
 
   return (
@@ -54,20 +65,21 @@ export function ProfileScreen() {
           }
         ]}>
           <View style={styles.profileHeader}>
-            <Image 
-              source={{ uri: user.avatar }} 
-              style={[styles.avatar, { borderColor: isDark ? '#333' : '#E6F2F7' }]}
-              contentFit="cover"
-            />
+            <View style={[styles.avatar, { borderColor: isDark ? '#333' : '#E6F2F7', backgroundColor: '#0A7EA4', justifyContent: 'center', alignItems: 'center' }]}>
+              <ThemedText style={{ color: '#fff', fontSize: 24, fontWeight: 'bold' }}>
+                {getInitials(displayUser.name)}
+              </ThemedText>
+            </View>
             <View style={styles.profileInfo}>
-              <ThemedText style={styles.profileName}>{user.name}</ThemedText>
-              <ThemedText style={{ color: colors.icon }}>{user.email}</ThemedText>
+              <ThemedText style={styles.profileName}>{displayUser.name}</ThemedText>
+              <ThemedText style={{ color: colors.icon }}>{displayUser.email}</ThemedText>
             </View>
           </View>
           
           <TouchableOpacity 
             style={[styles.editButton, { backgroundColor: colors.tint }]}
             activeOpacity={0.8}
+            onPress={() => router.push('/edit-profile' as any)}
           >
             <ThemedText style={styles.editButtonText}>Editar Perfil</ThemedText>
           </TouchableOpacity>
@@ -107,7 +119,11 @@ export function ProfileScreen() {
             <IconSymbol name="chevron.right" size={20} color={colors.icon} />
           </TouchableOpacity>
 
-          <TouchableOpacity style={[styles.row, { borderBottomWidth: 0 }]} activeOpacity={0.7}>
+          <TouchableOpacity 
+            style={[styles.row, { borderBottomWidth: 0 }]} 
+            activeOpacity={0.7}
+            onPress={signOut}
+          >
             <View style={[styles.iconBox, { backgroundColor: isDark ? 'rgba(239, 68, 68, 0.2)' : '#FEE2E2' }]}>
               <IconSymbol name="arrow.right.square.fill" size={20} color={isDark ? '#F87171' : '#EF4444'} />
             </View>
