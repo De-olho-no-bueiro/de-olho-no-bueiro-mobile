@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useLocalSearchParams } from 'expo-router';
-import { AsyncStorageReporteRepository } from '@/features/reportes/services/AsyncStorageReporteRepository';
+import { ApiReporteRepository } from '@/features/reportes/services/ApiReporteRepository';
 import { ApiCommentRepository, Comment } from '@/features/reportes/services/ApiCommentRepository';
 
 export function useReportDetailsViewModel() {
@@ -17,21 +17,25 @@ export function useReportDetailsViewModel() {
     async function loadData() {
       if (!id) return;
       
-      const repo = new AsyncStorageReporteRepository();
+      const repo = new ApiReporteRepository();
       try {
+        let found: any = null;
         if (tipo === 'bueiro') {
           const manholes = await repo.carregarManholes();
-          const found = manholes.find((m) => m.id === id);
-          if (found) setData(found);
+          found = manholes.find((m) => m.id === id);
         } else if (tipo === 'alagamento') {
           const areas = await repo.carregarFloodAreas();
-          const found = areas.find((a) => a.id === id);
-          if (found) setData(found);
+          found = areas.find((a) => a.id === id);
         } else {
-          // Fallback legacy reportes
            const reportes = await repo.carregarReportes();
-           const found = reportes.find((r) => r.id === id);
-           if (found) setData(found);
+           found = reportes.find((r) => r.id === id);
+        }
+
+        if (found) {
+          setData(found);
+          const targetPostId = found.postId || found.id;
+          const apiComments = await commentRepo.getComments(targetPostId);
+          setComments(apiComments);
         }
       } catch (err) {
         console.error(err);
@@ -40,19 +44,13 @@ export function useReportDetailsViewModel() {
       }
     }
     
-    async function loadComments() {
-      if (!id) return;
-      const apiComments = await commentRepo.getComments(id);
-      setComments(apiComments);
-    }
-    
     loadData();
-    loadComments();
   }, [id, tipo]);
 
   const enviarComentario = async (text: string) => {
-    if (!id || !text) return;
-    const newComment = await commentRepo.addComment(id, text);
+    if (!id || !text || !data) return;
+    const targetPostId = data.postId || data.id;
+    const newComment = await commentRepo.addComment(targetPostId, text);
     if (newComment) {
       setComments((prev) => [...prev, newComment]);
     }

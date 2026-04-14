@@ -17,6 +17,7 @@ export interface Reporte {
 
 export interface Manhole {
   id: string;
+  postId?: string;
   latitude: number;
   longitude: number;
   descricao?: string;
@@ -28,6 +29,7 @@ export interface Manhole {
 
 export interface FloodArea {
   id: string;
+  postId?: string;
   coordinates: { latitude: number; longitude: number }[];
   nivel: NivelAlagamento; // 'baixo' | 'leve' | 'medio' | 'grave'
   descricao?: string;

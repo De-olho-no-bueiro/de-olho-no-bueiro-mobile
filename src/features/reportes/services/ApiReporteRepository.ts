@@ -60,7 +60,11 @@ export class ApiReporteRepository implements IReporteRepository {
       method: 'POST',
       body: JSON.stringify(reporte)
     });
-    if (!response.ok) throw new Error('Falha ao adicionar reporte');
+    if (!response.ok) {
+      const errText = await response.text();
+      console.error(`[API] Erro ao adicionar reporte. Status: ${response.status}. Detalhes:`, errText);
+      throw new Error(`Falha ao adicionar reporte (Status ${response.status})`);
+    }
   }
 
   async salvarManholes(manholes: Manhole[]): Promise<void> {}
@@ -71,12 +75,17 @@ export class ApiReporteRepository implements IReporteRepository {
       if (!response.ok) return [];
       const data = await response.json();
       return data.map((d: any) => {
-        const midiasParsed = d.medias && Array.isArray(d.medias) ? d.medias.map(parseBufferToDataUrl).filter(Boolean) : [];
+        const latestPost = (d.posts && d.posts.length > 0) ? d.posts[0] : null;
+        const rawMedias = latestPost ? latestPost.medias : d.medias;
+        const midiasParsed = rawMedias && Array.isArray(rawMedias) ? rawMedias.map(parseBufferToDataUrl).filter(Boolean) : [];
+        const postId = latestPost ? latestPost.id.toString() : undefined;
+
         return {
           id: d.id.toString(),
+          postId: postId,
           latitude: d.latitude,
           longitude: d.longitude,
-          descricao: d.name,
+          descricao: latestPost?.content || d.name,
           dataHora: d.createdAt,
           is_finished: false,
           midiasUri: midiasParsed,
@@ -92,7 +101,11 @@ export class ApiReporteRepository implements IReporteRepository {
       method: 'POST',
       body: JSON.stringify(manhole)
     });
-    if (!response.ok) throw new Error('Falha ao adicionar bueiro');
+    if (!response.ok) {
+      const errText = await response.text();
+      console.error(`[API] Erro ao adicionar bueiro. Status: ${response.status}. Detalhes:`, errText);
+      throw new Error(`Falha ao adicionar bueiro (Status ${response.status})`);
+    }
   }
 
   async salvarFloodAreas(areas: FloodArea[]): Promise<void> {}
@@ -108,12 +121,18 @@ export class ApiReporteRepository implements IReporteRepository {
           latitude: lat,
           longitude: d.longitude[idx],
         }));
-        const midiasParsed = d.medias && Array.isArray(d.medias) ? d.medias.map(parseBufferToDataUrl).filter(Boolean) : [];
+        
+        const latestPost = (d.posts && d.posts.length > 0) ? d.posts[0] : null;
+        const rawMedias = latestPost ? latestPost.medias : d.medias;
+        const midiasParsed = rawMedias && Array.isArray(rawMedias) ? rawMedias.map(parseBufferToDataUrl).filter(Boolean) : [];
+        const postId = latestPost ? latestPost.id.toString() : undefined;
+
         return {
           id: d.id.toString(),
+          postId: postId,
           coordinates,
-          nivel: 'grave', // Mocking based on whatever Area provides if it lacks a `nivel` column locally
-          descricao: d.name,
+          nivel: latestPost?.nivel || 'grave',
+          descricao: latestPost?.content || d.name,
           dataHora: d.createdAt,
           is_finished: false,
           midiasUri: midiasParsed,
@@ -129,7 +148,11 @@ export class ApiReporteRepository implements IReporteRepository {
       method: 'POST',
       body: JSON.stringify(area)
     });
-    if (!response.ok) throw new Error('Falha ao adicionar área de alagamento');
+    if (!response.ok) {
+      const errText = await response.text();
+      console.error(`[API] Erro ao adicionar área de alagamento. Status: ${response.status}. Detalhes:`, errText);
+      throw new Error(`Falha ao adicionar área de alagamento (Status ${response.status})`);
+    }
   }
 
   async limparTodosReportes(): Promise<void> {
