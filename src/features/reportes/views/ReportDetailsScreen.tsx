@@ -1,33 +1,45 @@
 import React, { useState } from 'react';
-import { View, ScrollView, TouchableOpacity, ActivityIndicator, TextInput, KeyboardAvoidingView, Platform, Keyboard } from 'react-native';
+import { View, ScrollView, TouchableOpacity, ActivityIndicator, TextInput, KeyboardAvoidingView, Platform, Keyboard, Dimensions, StyleSheet, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Image } from 'expo-image';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ThemedText } from '@/core/components/atoms/themed-text';
 import { ThemedView } from '@/core/components/atoms/themed-view';
 import { IconSymbol } from '@/core/components/atoms/icon-symbol';
 import { Feather } from '@expo/vector-icons';
-import { Colors } from '@/core/constants/theme';
 import { useColorScheme } from '@/core/hooks/use-color-scheme';
+import { Colors } from '@/core/constants/theme';
 import { useReportDetailsViewModel } from '../viewmodels/useReportDetailsViewModel';
 import { detailsStyles as styles } from './styles/detailsStyles';
 
-function getNivelConfig(nivel: string) {
-  switch (nivel) {
-    case 'leve': return { title: 'Médio', color: '#FFB800', bg: 'rgba(255, 184, 0, 0.15)' };
-    case 'medio': return { title: 'Avançado', color: '#FF8800', bg: 'rgba(255, 136, 0, 0.15)' };
-    case 'grave': return { title: 'Extremo', color: '#FF3B30', bg: 'rgba(255, 59, 48, 0.15)' };
-    case 'baixo': return { title: 'Baixo', color: '#34C759', bg: 'rgba(52, 199, 89, 0.15)' };
-    default: return { title: 'Reporte', color: '#0a7ea4', bg: 'rgba(10, 126, 164, 0.15)' };
-  }
+const { width } = Dimensions.get('window');
+
+const LEVEL_CONFIG = {
+  baixo: { label: 'Baixo', color: '#34C759', bg: 'rgba(52, 199, 89, 0.15)' },
+  leve: { label: 'Médio', color: '#FFB800', bg: 'rgba(255, 184, 0, 0.15)' },
+  medio: { label: 'Avançado', color: '#FF8800', bg: 'rgba(255, 136, 0, 0.15)' },
+  grave: { label: 'Extremo', color: '#FF3B30', bg: 'rgba(255, 59, 48, 0.15)' },
+};
+
+const AVATAR_COLORS = ['#0A7EA4', '#F57C00', '#7C4DFF', '#00BCD4', '#E91E63', '#4CAF50', '#FF6B6B', '#4ECDC4'];
+
+function getAvatarColor(name: string): string {
+  const index = name.charCodeAt(0) % AVATAR_COLORS.length;
+  return AVATAR_COLORS[index];
 }
 
 export function ReportDetailsScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme();
-  const colors = Colors[colorScheme ?? 'light'];
   const isDark = colorScheme === 'dark';
+  const themeColors = isDark ? Colors.dark : Colors.light;
   const vm = useReportDetailsViewModel();
+  
   const [newComment, setNewComment] = useState('');
+  const [currentPage, setCurrentPage] = useState(0);
+  const [liked, setLiked] = useState(false);
+  const [likeCount, setLikeCount] = useState(Math.floor(Math.random() * 50) + 1);
 
   const handleSendComment = async () => {
     if (!newComment.trim()) return;
@@ -36,169 +48,297 @@ export function ReportDetailsScreen() {
     setNewComment('');
   };
 
+  const handleLike = () => {
+    setLiked(!liked);
+    setLikeCount(liked ? likeCount - 1 : likeCount + 1);
+  };
+
   if (vm.loading) {
     return (
-      <View style={[styles.container, { backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }]}>
-        <ActivityIndicator size="large" color={colors.tint} />
+      <View style={[styles.container, { backgroundColor: themeColors.background }, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={themeColors.tint} />
       </View>
     );
   }
 
   if (!vm.data) {
     return (
-      <View style={[styles.container, { backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center', padding: 20 }]}>
-        <Feather name="alert-circle" size={48} color={colors.icon} style={{ marginBottom: 16 }} />
+      <View style={[styles.container, { backgroundColor: themeColors.background }, { justifyContent: 'center', alignItems: 'center', padding: 20 }]}>
+        <Feather name="alert-circle" size={48} color={themeColors.icon} style={{ marginBottom: 16 }} />
         <ThemedText style={{ textAlign: 'center', fontSize: 18 }}>Reporte não encontrado.</ThemedText>
         <TouchableOpacity style={{ marginTop: 24 }} onPress={() => router.back()}>
-          <ThemedText type="link">Voltar ao mapa</ThemedText>
+          <ThemedText style={{ color: themeColors.tint }}>Voltar ao mapa</ThemedText>
         </TouchableOpacity>
       </View>
     );
   }
 
   const { tipo, data, comments } = vm;
-  const nivelConfig = getNivelConfig(data.nivel || 'baixo');
-  
-  // Handling arrays of media or single photoUri
+  const nivelKey = (data.nivel || 'baixo') as keyof typeof LEVEL_CONFIG;
+  const levelConfig = LEVEL_CONFIG[nivelKey] || LEVEL_CONFIG.baixo;
   const hasImages = (data.midiasUri && data.midiasUri.length > 0) || !!data.fotoUri;
-  const coverImage = data.midiasUri?.[0] || data.fotoUri;
-  const dateStr = new Date(data.dataHora).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+  const images = data.midiasUri?.length ? data.midiasUri : data.fotoUri ? [data.fotoUri] : [];
+  const imageCount = images.length;
+  
+  const formatDate = (dateStr: string) => {
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+    
+    if (diffMins < 1) return 'agora';
+    if (diffMins < 60) return `${diffMins}m`;
+    if (diffHours < 24) return `${diffHours}h`;
+    if (diffDays < 7) return `${diffDays}d`;
+    return date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
+  };
+
+  const getAuthorInitial = () => {
+    const name = data.autor || 'Usuário';
+    return name.charAt(0).toUpperCase();
+  };
+
+  const textPrimary = isDark ? '#F5F5F7' : '#1A1A1A';
+  const textSecondary = isDark ? '#8E8E93' : '#6B7280';
+  const borderColor = isDark ? '#38383A' : '#E5E7EB';
+  const cardBg = isDark ? '#1C1C1E' : '#FFFFFF';
+  const inputBg = isDark ? '#1C1C1E' : '#F3F4F6';
+  const inputTextColor = isDark ? '#F5F5F7' : '#1A1A1A';
+  const placeholderColor = isDark ? '#636366' : '#9CA3AF';
+  const mediaBg = isDark ? '#000' : '#F3F4F6';
+  const wazeBlue = '#33CCFF';
 
   return (
     <KeyboardAvoidingView 
-      style={{ flex: 1 }} 
+      style={[styles.container, { backgroundColor: themeColors.background }]} 
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={0}
     >
-      <ThemedView style={styles.container}>
-        <ScrollView bounces={false} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
-          {hasImages ? (
-            <View style={styles.carouselContainer}>
-              <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false} style={styles.carousel}>
-                {(data.midiasUri || [data.fotoUri]).map((uri: string, index: number) => (
-                  <View key={index} style={styles.carouselImageWrapper}>
-                    <Image source={{ uri }} style={styles.carouselImage} contentFit="cover" />
-                  </View>
-                ))}
-              </ScrollView>
-              {data.midiasUri && data.midiasUri.length > 1 && (
-                <View style={styles.imageHint}>
-                  <ThemedText style={styles.imageHintText}>
-                    Deslize para ver todas ({data.midiasUri.length})
+      <ThemedView style={styles.safeArea}>
+        <View style={[styles.topSpacer, { height: insets.top, backgroundColor: themeColors.background }]} />
+        <View style={styles.mainContent}>
+          <ScrollView 
+            bounces={false} 
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ paddingBottom: 100 }}
+          >
+            <View style={[styles.mediaContainer, { backgroundColor: mediaBg }]}>
+            <ScrollView 
+              horizontal 
+              pagingEnabled 
+              showsHorizontalScrollIndicator={false}
+              style={styles.mediaScroll}
+              onMomentumScrollEnd={(e) => {
+                const page = Math.round(e.nativeEvent.contentOffset.x / width);
+                setCurrentPage(page);
+              }}
+            >
+              {hasImages ? (
+                images.map((uri: string, index: number) => (
+                  <Image 
+                    key={index} 
+                    source={{ uri }} 
+                    style={styles.mediaImage}
+                    contentFit="cover"
+                  />
+                ))
+              ) : (
+                <View style={[styles.mediaPlaceholder, { backgroundColor: mediaBg }]}>
+                  <IconSymbol 
+                    name={tipo === 'alagamento' ? 'water' : 'exclamationmark.triangle'} 
+                    size={72} 
+                    color={isDark ? '#444' : '#9CA3AF'} 
+                  />
+                </View>
+              )}
+            </ScrollView>
+            
+            <View style={[styles.headerOverlay, { paddingTop: insets.top + 12 }]}>
+              <TouchableOpacity 
+                style={[styles.headerButton, { backgroundColor: isDark ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.9)' }]} 
+                onPress={() => router.back()}
+              >
+                <IconSymbol name="chevron.left" size={24} color={isDark ? '#FFF' : '#333'} />
+              </TouchableOpacity>
+              {imageCount > 1 && (
+                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.65)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16 }}>
+                  <IconSymbol name="photo.fill" size={14} color="#FFF" style={{ marginRight: 6 }} />
+                  <ThemedText style={{ color: '#FFF', fontSize: 13, fontWeight: '600' }}>
+                    {currentPage + 1}/{imageCount}
                   </ThemedText>
                 </View>
               )}
             </View>
-          ) : (
-            <View style={[styles.headerImage, { backgroundColor: isDark ? '#333' : '#e1e1e1', alignItems: 'center', justifyContent: 'center' }]}>
-              <IconSymbol name="photo.fill" size={64} color={colors.icon} />
-            </View>
-          )}
 
-          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-            <View style={styles.backButtonPill}>
-              <IconSymbol name="chevron.left" size={20} color="#333" />
-              <ThemedText style={styles.backButtonText}>Voltar</ThemedText>
-            </View>
-          </TouchableOpacity>
+            {imageCount > 1 && (
+              <View style={styles.dotsContainer}>
+                {images.map((_: string, index: number) => (
+                  <View
+                    key={index}
+                    style={[
+                      styles.dot,
+                      { backgroundColor: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.25)' },
+                      index === currentPage && [styles.dotActive, { backgroundColor: isDark ? '#FFF' : '#333' }]
+                    ]}
+                  />
+                ))}
+              </View>
+            )}
+          </View>
 
-          <View style={[styles.contentWrapper, { backgroundColor: isDark ? '#121212' : '#FFFFFF' }]}>
-            
-            {/* Card Principal de Resumo */}
-            <View style={[styles.card, { backgroundColor: colors.surface }]}>
-              <View style={styles.titleRow}>
-                <View style={styles.titleIconWrapper}>
-                  <IconSymbol name={tipo === 'alagamento' ? 'water' : 'warning'} size={24} color={tipo === 'alagamento' ? '#1A73E8' : '#F57C00'} />
+          <View style={[styles.content, { backgroundColor: themeColors.background }]}>
+            <View style={styles.authorRow}>
+              <View style={[styles.authorAvatar, { backgroundColor: getAvatarColor(data.autor || 'U') }]}>
+                <ThemedText style={styles.authorInitial}>{getAuthorInitial()}</ThemedText>
+              </View>
+              <View style={styles.authorInfo}>
+                <ThemedText style={[styles.authorName, { color: textPrimary }]}>
+                  {data.autor || 'Usuário Anônimo'}
+                </ThemedText>
+                <View style={styles.authorMeta}>
+                  <ThemedText style={[styles.metaText, { color: textSecondary }]}>{formatDate(data.dataHora)}</ThemedText>
+                  <ThemedText style={[styles.metaDot, { color: textSecondary }]}>·</ThemedText>
+                  <IconSymbol name="globe" size={12} color={textSecondary} />
                 </View>
-                <ThemedText style={styles.title}>
+              </View>
+            </View>
+
+            <View style={styles.titleSection}>
+              <View style={styles.typeLabel}>
+                <IconSymbol 
+                  name={tipo === 'alagamento' ? 'drop.fill' : 'exclamationmark.triangle.fill'} 
+                  size={14} 
+                  color={tipo === 'alagamento' ? '#1A73E8' : '#F57C00'}
+                  style={styles.typeIcon}
+                />
+                <ThemedText style={[styles.typeText, { color: tipo === 'alagamento' ? '#1A73E8' : '#F57C00' }]}>
                   {tipo === 'alagamento' ? 'Área de Alagamento' : 'Bueiro Danificado'}
                 </ThemedText>
               </View>
-              
-              {(tipo === 'alagamento' || data.nivel) && (
-                <View style={[styles.statusBadge, { backgroundColor: nivelConfig.bg, borderColor: nivelConfig.color }]}>
-                  <ThemedText style={[styles.statusText, { color: nivelConfig.color }]}>
-                    {tipo === 'alagamento' ? 'Gravidade:' : 'Status:'} {nivelConfig.title}
+              <ThemedText style={[styles.title, { color: textPrimary }]}>
+                {data.endereco || 'Local sem endereço especificado'}
+              </ThemedText>
+            </View>
+
+            <View style={[styles.statusBadge, { backgroundColor: levelConfig.bg }]}>
+              <View style={[styles.statusDot, { backgroundColor: levelConfig.color }]} />
+              <ThemedText style={[styles.statusText, { color: levelConfig.color }]}>
+                {levelConfig.label}
+              </ThemedText>
+            </View>
+
+            {data.descricao && (
+              <ThemedText style={[styles.description, { color: textSecondary }]}>
+                {data.descricao}
+              </ThemedText>
+            )}
+
+            <View style={[styles.locationSection, { borderColor }]}>
+              <IconSymbol name="location.fill" size={18} color={textSecondary} style={styles.locationIcon} />
+              <ThemedText style={[styles.locationText, { color: textSecondary }]}>
+                {data.endereco || (data.latitude != null && data.longitude != null
+                  ? `Coordenadas: ${data.latitude.toFixed(6)}, ${data.longitude.toFixed(6)}`
+                  : 'Coordenadas não disponíveis')}
+              </ThemedText>
+            </View>
+
+            <View style={styles.actionsRow}>
+              <Pressable style={styles.actionButton} onPress={handleLike}>
+                <View style={[styles.actionIconWrapper, liked && { backgroundColor: 'rgba(255, 59, 48, 0.1)' }]}>
+                  <IconSymbol 
+                    name={liked ? 'heart.fill' : 'heart'} 
+                    size={22} 
+                    color={liked ? '#FF3B30' : textSecondary} 
+                  />
+                </View>
+                <ThemedText style={[styles.actionCount, { color: liked ? '#FF3B30' : textSecondary }]}>
+                  {likeCount}
+                </ThemedText>
+              </Pressable>
+
+              <Pressable style={styles.actionButton}>
+                <View style={styles.actionIconWrapper}>
+                  <IconSymbol name="bubble.right" size={20} color={textSecondary} />
+                </View>
+                <ThemedText style={[styles.actionCount, { color: textSecondary }]}>
+                  {comments.length}
+                </ThemedText>
+              </Pressable>
+
+              <Pressable style={styles.actionButton}>
+                <View style={styles.actionIconWrapper}>
+                  <IconSymbol name="square.and.arrow.up" size={20} color={textSecondary} />
+                </View>
+                <ThemedText style={[styles.actionCount, { color: textSecondary }]}>
+                  Compartilhar
+                </ThemedText>
+              </Pressable>
+            </View>
+
+            <View style={[styles.divider, { backgroundColor: borderColor }]} />
+
+            <View style={styles.commentsHeader}>
+              <ThemedText style={[styles.commentsTitle, { color: textPrimary }]}>
+                Comentários {comments.length > 0 && `(${comments.length})`}
+              </ThemedText>
+            </View>
+
+            <View style={styles.commentsList}>
+              {comments.length === 0 ? (
+                <View style={styles.emptyComments}>
+                  <ThemedText style={[styles.emptyCommentsText, { color: textSecondary }]}>
+                    Nenhum comentário ainda.{'\n'}Seja o primeiro a comentar!
                   </ThemedText>
                 </View>
-              )}
-
-              <View style={styles.infoRow}>
-                <IconSymbol name="clock.fill" size={18} color={colors.icon} />
-                <ThemedText style={[styles.infoText, { color: colors.icon }]}>Registrado em {dateStr}</ThemedText>
-              </View>
-              
-              <View style={styles.infoRow}>
-                <IconSymbol name="location.fill" size={18} color={colors.icon} />
-                <ThemedText style={[styles.infoText, { color: colors.text }]} numberOfLines={3}>
-                  {data.endereco || 'Localização marcada no mapa'}
-                </ThemedText>
-              </View>
-            </View>
-
-            {/* Card da Descrição */}
-            {data.descricao ? (
-              <View style={[styles.card, { backgroundColor: colors.surface }]}>
-                <ThemedText style={styles.sectionTitle}>Descrição do reporte</ThemedText>
-                <View style={[styles.divider, { backgroundColor: colors.border }]} />
-                <ThemedText style={[styles.description, { color: colors.text }]}>{data.descricao}</ThemedText>
-              </View>
-            ) : null}
-
-            {/* Card de Comentários */}
-            <View style={[styles.card, { backgroundColor: colors.surface }]}>
-              <ThemedText style={styles.sectionTitle}>Comentários da Comunidade ({comments.length})</ThemedText>
-              <View style={[styles.divider, { backgroundColor: colors.border, marginBottom: 16 }]} />
-              
-              <View style={styles.commentsContainer}>
-                {comments.length === 0 ? (
-                  <ThemedText style={{ color: colors.icon, textAlign: 'center', marginVertical: 12 }}>
-                    Nenhum comentário por enquanto. Seja o primeiro!
-                  </ThemedText>
-                ) : (
-                  comments.map((c) => {
-                    const authorName = c.author?.name || 'Usuário';
-                    const initial = authorName.charAt(0).toUpperCase();
-                    const timeStr = new Date(c.createdAt).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
-                    return (
-                      <View key={c.id} style={styles.commentItem}>
-                        <View style={[styles.avatar, { backgroundColor: '#1A73E8' }]}>
-                          <ThemedText style={{ color: '#FFF', fontWeight: 'bold' }}>{initial}</ThemedText>
-                        </View>
-                        <View style={[styles.commentBubble, { backgroundColor: isDark ? '#333' : '#F8FAFC' }]}>
-                          <View style={styles.commentHeader}>
-                            <ThemedText style={styles.commentName}>{authorName}</ThemedText>
-                            <ThemedText style={[styles.commentTime, { color: colors.icon }]}>{timeStr}</ThemedText>
-                          </View>
-                          <ThemedText style={[styles.commentText, { color: colors.text }]}>{c.content}</ThemedText>
-                        </View>
+              ) : (
+                comments.map((c) => {
+                  const authorName = c.author?.name || 'Usuário';
+                  const initial = authorName.charAt(0).toUpperCase();
+                  return (
+                    <View key={c.id} style={styles.commentItem}>
+                      <View style={[styles.commentAvatar, { backgroundColor: getAvatarColor(authorName) }]}>
+                        <ThemedText style={{ color: '#FFF', fontWeight: '700', fontSize: 14 }}>{initial}</ThemedText>
                       </View>
-                    );
-                  })
-                )}
-              </View>
+                      <View style={[styles.commentContent, { backgroundColor: cardBg }]}>
+                        <View style={styles.commentHeader}>
+                          <ThemedText style={[styles.commentName, { color: textPrimary }]}>{authorName}</ThemedText>
+                          <ThemedText style={[styles.commentTime, { color: textSecondary }]}>· {formatDate(c.createdAt)}</ThemedText>
+                        </View>
+                        <ThemedText style={[styles.commentText, { color: textSecondary }]}>
+                          {c.content}
+                        </ThemedText>
+                      </View>
+                    </View>
+                  );
+                })
+              )}
             </View>
-
           </View>
         </ScrollView>
 
-        {/* Componente Fixo de Adicionar Comentário */}
-        <View style={[styles.commentInputWrapper, { backgroundColor: isDark ? '#121212' : '#FFFFFF', borderTopColor: isDark ? '#333' : '#EAF0F6' }]}>
+        <View style={[styles.commentInputWrapper, { backgroundColor: themeColors.background, borderTopColor: borderColor }]}>
           <TextInput
-            style={[styles.commentInput, { color: isDark ? '#FFF' : '#0F172A', backgroundColor: isDark ? '#333' : '#F8FAFC', borderColor: isDark ? '#444' : '#EAF0F6' }]}
-            placeholder="Adicione um comentário..."
-            placeholderTextColor={colors.icon}
+            style={[styles.commentInput, { backgroundColor: inputBg, color: inputTextColor }]}
+            placeholder="Comentar..."
+            placeholderTextColor={placeholderColor}
             value={newComment}
             onChangeText={setNewComment}
             multiline
             maxLength={250}
           />
           <TouchableOpacity 
-            style={[styles.commentSubmitButton, !newComment.trim() && styles.commentSubmitButtonDisabled]}
+            style={[
+              styles.commentSubmitButton, 
+              !newComment.trim() && styles.commentSubmitButtonDisabled
+            ]}
             onPress={handleSendComment}
             disabled={!newComment.trim()}
           >
-            <IconSymbol name="paperplane.fill" size={20} color="#FFF" />
+            <IconSymbol name="paperplane.fill" size={18} color="#FFF" />
           </TouchableOpacity>
+        </View>
         </View>
       </ThemedView>
     </KeyboardAvoidingView>

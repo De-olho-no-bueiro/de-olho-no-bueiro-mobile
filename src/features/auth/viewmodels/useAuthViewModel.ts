@@ -21,8 +21,8 @@ export function useAuthViewModel() {
     setIsSubmitting(true);
     try {
       await signIn(email, password);
-    } catch (error) {
-       Alert.alert('Erro', 'Falha ao logar.');
+    } catch (error: any) {
+       Alert.alert('Erro', error?.message || 'Falha ao logar.');
     } finally {
       setIsSubmitting(false);
     }
@@ -40,8 +40,8 @@ export function useAuthViewModel() {
     setIsSubmitting(true);
     try {
       await signUp(name, email, password);
-    } catch (error) {
-       Alert.alert('Erro', 'Falha ao cadastrar.');
+    } catch (error: any) {
+       Alert.alert('Erro', error?.message || 'Falha ao cadastrar.');
     } finally {
       setIsSubmitting(false);
     }

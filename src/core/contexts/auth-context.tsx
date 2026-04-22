@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import * as SecureStore from 'expo-secure-store';
 import { API_URL } from '../utils/api';
+import { decode } from 'base-64';
 
 type User = {
   id: string;
@@ -36,6 +37,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     const checkSession = async () => {
       try {
+        const token = await SecureStore.getItemAsync('userToken');
+        if (token) {
+          try {
+            const payloadBase64 = token.split('.')[1];
+            if (payloadBase64) {
+              const base64 = payloadBase64.replace(/-/g, '+').replace(/_/g, '/');
+              const decodedPayload = JSON.parse(decode(base64));
+
+              if (decodedPayload.exp && decodedPayload.exp * 1000 < Date.now()) {
+                console.log('Token expirado. Deslogando localmente...');
+                await SecureStore.deleteItemAsync('userToken');
+                await SecureStore.deleteItemAsync('userData');
+                setUser(null);
+                return;
+              }
+            }
+          } catch (jwtError) {
+            console.error('Erro ao ler JWT', jwtError);
+            await SecureStore.deleteItemAsync('userToken');
+            await SecureStore.deleteItemAsync('userData');
+            setUser(null);
+            return;
+          }
+        }
+
         const storedUser = await SecureStore.getItemAsync('userData');
         if (storedUser) {
           setUser(JSON.parse(storedUser));
@@ -54,14 +80,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const resp = await fetch(`${API_URL}/mobile/v1/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password: password || '123' }), // fallback na senha só pra não travar tela se a ui não mandar
+        body: JSON.stringify({ email, password: password || '123' }),
       });
       
-      const data = await resp.json();
-      
+      let data: any;
       if (!resp.ok) {
-        throw new Error(data.message || 'Falha no login');
+        try {
+          data = await resp.json();
+        } catch {
+          const text = await resp.text();
+          throw new Error(text || 'Credenciais inválidas');
+        }
+        throw new Error(data?.message || 'Credenciais inválidas');
       }
+      
+      data = await resp.json();
       
       const loggedUser: User = {
         id: data.userId || `user-${Date.now()}`,
@@ -87,13 +120,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         body: JSON.stringify({ name, email, password: password || '123' }),
       });
       
-      const data = await resp.json().catch(() => null);
-
+      let data: any;
       if (!resp.ok) {
+        try {
+          data = await resp.json();
+        } catch {
+          const text = await resp.text();
+          throw new Error(text || 'Falha no cadastro');
+        }
         throw new Error(data?.message || 'Falha no cadastro');
       }
       
-      await signIn(email, password || '123'); // auto-login
+      data = await resp.json();
+      
+      await signIn(email, password || '123');
     } catch(err) {
       console.error('Erro no SignUp: ', err);
       throw err;

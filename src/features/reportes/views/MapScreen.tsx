@@ -25,6 +25,7 @@ import {
 import { Image } from "expo-image";
 
 import MapViewComponent from "@/core/components/organisms/map-view";
+import { Background } from "@react-navigation/elements";
 
 const FILTROS: { key: FiltroOpcao; label: string; icon: string }[] = [
   { key: "todos", label: "Todos", icon: "map" },
@@ -290,7 +291,7 @@ export function MapScreen() {
           styles.bottomCard,
           {
             backgroundColor: colors.surface,
-            paddingBottom: Math.max(16, insets.bottom),
+            padding: (!vm.isDrawing && !(vm.selectedPoint && !vm.modalVisible) && tipoAlerta === "idle") ? 6 : 16,
           },
           Layout.shadow,
         ]}
@@ -443,7 +444,7 @@ export function MapScreen() {
             </View>
           </View>
         ) : tipoAlerta === "idle" ? (
-          <View style={{ paddingTop: 12 }}>
+          <View style={{ paddingTop: 2 }}>
             <TouchableOpacity
               style={[styles.button, { backgroundColor: colors.tint }]}
               onPress={() => setTipoAlerta("choosing")}
@@ -873,8 +874,8 @@ const styles = StyleSheet.create({
     bottom: 24,
     left: 20,
     right: 20,
-    padding: 20,
-    borderRadius: 28,
+    padding: 6,
+    borderRadius: 16,
     zIndex: 5,
     backgroundColor: "#FFFFFF",
     borderWidth: 1,
@@ -925,10 +926,10 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 8,
-    paddingVertical: 14,
-    paddingHorizontal: 20,
-    borderRadius: 16, // Modern shape
+    gap: 6,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 14, // Modern shape
   },
   buttonConfirmar: {
     flex: 1,

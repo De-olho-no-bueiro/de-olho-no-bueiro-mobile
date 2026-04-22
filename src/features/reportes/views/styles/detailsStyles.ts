@@ -7,215 +7,286 @@ export const detailsStyles = StyleSheet.create({
     flex: 1,
   },
   
-  // Header / Carousel Images
-  headerImageContainer: {
-    height: 250,
-    width: '100%',
-    position: 'relative',
-    backgroundColor: '#ccc',
+  safeArea: {
+    flex: 1,
   },
-  headerImage: {
-    width: '100%',
-    height: 250,
-  },
-  carouselContainer: {
-    width: '100%',
-    height: 300,
-    position: 'relative',
-    backgroundColor: '#ccc',
-  },
-  carousel: {
-    width: '100%',
-    height: '100%',
-  },
-  carouselImageWrapper: {
-    width,
-    height: 300,
-  },
-  carouselImage: {
-    width: '100%',
-    height: '100%',
-  },
-  imageHint: {
+
+  topSpacer: {
     position: 'absolute',
-    bottom: 48, // Acima do card arredondado que sobe
-    right: 16,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 100,
   },
-  imageHintText: {
-    color: '#FFF',
-    fontSize: 13,
-    fontWeight: '700',
+
+  mainContent: {
+    flex: 1,
+  },
+
+  mediaContainer: {
+    width: '100%',
+    height: 380,
+    backgroundColor: '#000',
+  },
+  mediaScroll: {
+    width: '100%',
+    height: '100%',
+  },
+  mediaImage: {
+    width: width,
+    height: 380,
+  },
+  mediaPlaceholder: {
+    width: width,
+    height: 380,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#1a1a1a',
   },
   
-  // Custom Waze Back Button (Pill)
-  backButton: {
+  headerOverlay: {
     position: 'absolute',
-    top: 50,
-    left: 16,
-    zIndex: 10,
-  },
-  backButtonPill: {
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 100,
+    paddingTop: 56,
+    paddingHorizontal: 16,
+    paddingBottom: 12,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.95)',
+    justifyContent: 'space-between',
+    backgroundColor: 'rgba(0,0,0,0.3)',
+  },
+  headerButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    backdropFilter: 'blur(10px)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  
+  dotsContainer: {
+    position: 'absolute',
+    bottom: 16,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 100,
+  },
+  dot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginHorizontal: 3,
+    backgroundColor: 'rgba(255,255,255,0.4)',
+  },
+  dotActive: {
+    backgroundColor: '#fff',
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+
+  content: {
+    flex: 1,
+    paddingTop: 20,
     paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  backButtonText: {
-    marginLeft: 6,
-    fontWeight: '700',
-    color: '#333',
-    fontSize: 15,
   },
 
-  // Main Content Wrapper
-  contentWrapper: {
-    borderTopLeftRadius: 32,
-    borderTopRightRadius: 32,
-    marginTop: -32,
-    paddingHorizontal: 16,
-    paddingTop: 24,
-    paddingBottom: 40,
-    minHeight: 500,
-    backgroundColor: '#FFFFFF',
-  },
-
-  // Cards
-  card: {
-    borderRadius: 24,
-    padding: 20,
-    marginBottom: 16,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#EAF0F6',
-    shadowColor: '#0A7EA4',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.06,
-    shadowRadius: 12,
-    elevation: 2,
-  },
-
-  // Title Row
-  titleRow: {
+  authorRow: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 16,
   },
-  titleIconWrapper: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#E6F2F7',
+  authorAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#0A7EA4',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
   },
-  title: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: '#0A7EA4',
+  authorInitial: {
+    color: '#fff',
+    fontSize: 20,
+    fontWeight: '700',
+  },
+  authorInfo: {
     flex: 1,
   },
-  
-  // Status Badge
-  statusBadge: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 999,
-    borderWidth: 1,
-    alignSelf: 'flex-start',
-    marginBottom: 20,
-  },
-  statusText: {
+  authorName: {
+    fontSize: 16,
     fontWeight: '700',
-    fontSize: 14,
+    color: '#0F172A',
   },
-
-  // Info Rows
-  infoRow: {
+  authorMeta: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 14,
+    marginTop: 2,
   },
-  infoText: {
-    marginLeft: 12,
-    fontSize: 15,
-    fontWeight: '500',
-    flexShrink: 1,
-    color: '#334155',
+  metaDot: {
+    fontSize: 10,
+    color: '#64748B',
+    marginHorizontal: 4,
   },
-
-  // Divider
-  divider: {
-    height: 1,
-    width: '100%',
-    marginVertical: 16,
-    backgroundColor: '#EAF0F6',
+  metaText: {
+    fontSize: 14,
+    color: '#64748B',
   },
 
-  // Sections
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '800',
+  titleSection: {
+    marginBottom: 16,
+  },
+  typeLabel: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  typeIcon: {
+    marginRight: 6,
+  },
+  typeText: {
+    fontSize: 13,
+    fontWeight: '600',
     color: '#0A7EA4',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
+  title: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#0F172A',
+    lineHeight: 30,
+  },
+
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    marginBottom: 16,
+  },
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 8,
+  },
+  statusText: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+
   description: {
     fontSize: 15,
     lineHeight: 24,
     color: '#475569',
+    marginBottom: 20,
   },
 
-  // Comments List
-  commentsContainer: {
-    gap: 16,
+  locationSection: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingVertical: 14,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: '#E2E8F0',
+    marginBottom: 20,
+  },
+  locationIcon: {
+    marginRight: 10,
+    marginTop: 1,
+  },
+  locationText: {
+    flex: 1,
+    fontSize: 14,
+    color: '#64748B',
+    lineHeight: 20,
+  },
+
+  actionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  actionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 24,
+  },
+  actionIconWrapper: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 6,
+  },
+  actionCount: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+
+  divider: {
+    height: 1,
+    backgroundColor: '#E2E8F0',
+    marginVertical: 16,
+  },
+
+  commentsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginBottom: 16,
+  },
+  commentsTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+
+  commentsList: {
+    paddingBottom: 100,
   },
   commentItem: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    marginBottom: 18,
   },
-  avatar: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: '#0A7EA4',
-    marginRight: 12,
+  commentAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    marginRight: 10,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  commentBubble: {
+  commentContent: {
     flex: 1,
-    padding: 14,
-    borderRadius: 20,
-    borderTopLeftRadius: 4,
-    backgroundColor: '#F8FAFC',
-    borderWidth: 1,
-    borderColor: '#EAF0F6',
+    backgroundColor: '#F8F9FA',
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
   },
   commentHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'baseline',
-    marginBottom: 6,
+    alignItems: 'center',
+    marginBottom: 4,
   },
   commentName: {
-    fontWeight: '800',
     fontSize: 14,
+    fontWeight: '700',
     color: '#0F172A',
+    marginRight: 6,
   },
   commentTime: {
     fontSize: 12,
-    fontWeight: '600',
     color: '#94A3B8',
   },
   commentText: {
@@ -224,24 +295,35 @@ export const detailsStyles = StyleSheet.create({
     color: '#334155',
   },
 
-  // New Comment Input Fixed Bottom
+  emptyComments: {
+    paddingVertical: 32,
+    alignItems: 'center',
+  },
+  emptyCommentsText: {
+    fontSize: 14,
+    color: '#94A3B8',
+    textAlign: 'center',
+  },
+
   commentInputWrapper: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 12,
     backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
-    borderTopColor: '#EAF0F6',
+    borderTopColor: '#E2E8F0',
   },
   commentInput: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
-    borderWidth: 1,
-    borderColor: '#EAF0F6',
+    backgroundColor: '#F1F5F9',
     borderRadius: 24,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
     fontSize: 15,
     color: '#0F172A',
     maxHeight: 100,
@@ -253,9 +335,39 @@ export const detailsStyles = StyleSheet.create({
     backgroundColor: '#0A7EA4',
     alignItems: 'center',
     justifyContent: 'center',
-    marginLeft: 12,
+    marginLeft: 10,
   },
   commentSubmitButtonDisabled: {
     backgroundColor: '#CBD5E1',
-  }
+  },
+
+  darkContainer: {
+    backgroundColor: '#000',
+  },
+  darkContent: {
+    backgroundColor: '#000',
+  },
+  darkCard: {
+    backgroundColor: '#1C1C1E',
+  },
+  darkText: {
+    color: '#F5F5F7',
+  },
+  darkMuted: {
+    color: '#8E8E93',
+  },
+  darkBorder: {
+    borderColor: '#38383A',
+  },
+  darkInputWrapper: {
+    backgroundColor: '#1C1C1E',
+    borderTopColor: '#38383A',
+  },
+  darkInput: {
+    backgroundColor: '#2C2C2E',
+    color: '#F5F5F7',
+  },
+  darkCommentContent: {
+    backgroundColor: '#1C1C1E',
+  },
 });
