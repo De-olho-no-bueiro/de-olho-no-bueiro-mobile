@@ -7,6 +7,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import type { Reporte, TipoReporte, NivelAlagamento, Manhole, FloodArea } from '@/features/reportes/models/Reporte';
 import { ApiReporteRepository } from '@/features/reportes/services/ApiReporteRepository';
 import { ExpoGeoService } from '@/features/reportes/services/ExpoGeoService';
+import { ordenarPontosPoligono } from '@/features/reportes/utils/polygon';
 const reporteRepository = new ApiReporteRepository();
 const geoService = new ExpoGeoService();
 
@@ -71,6 +72,16 @@ export function useMapViewModel() {
   const [descricao, setDescricao] = useState('');
   const [midiasUri, setMidiasUri] = useState<string[]>([]);
   const [salvando, setSalvando] = useState(false);
+
+  const resetFormState = useCallback((options?: { preserveAddress?: boolean }) => {
+    setNivel('baixo');
+    setDescricao('');
+    setMidiasUri([]);
+    if (!options?.preserveAddress) {
+      setEndereco('');
+    }
+    setConfirmationAddress('');
+  }, []);
 
   const pedirPermissaoELocalizacao = useCallback(async () => {
     setLoadingLocation(true);
@@ -139,13 +150,17 @@ export function useMapViewModel() {
     try {
       const results = await Location.geocodeAsync(text);
       if (results.length > 0) {
-        const addresses: Location.LocationGeocodedAddress[] = [];
-        for (const coords of results.slice(0, 5)) {
-          const reverse = await Location.reverseGeocodeAsync(coords);
-          if (reverse[0]) {
-            addresses.push(reverse[0]);
+        // Limit to 5 results and fetch reverse geocode in parallel
+        const suggestionPromises = results.slice(0, 5).map(async (coords) => {
+          try {
+            const reverse = await Location.reverseGeocodeAsync(coords);
+            return reverse[0] || null;
+          } catch {
+            return null;
           }
-        }
+        });
+        
+        const addresses = (await Promise.all(suggestionPromises)).filter((addr): addr is Location.LocationGeocodedAddress => addr !== null);
         setSearchSuggestions(addresses);
       } else {
         setSearchSuggestions([]);
@@ -216,7 +231,7 @@ export function useMapViewModel() {
     let filtered = savedReportes;
 
     if (filtroAtivo === 'mais-graves') {
-      filtered = filtered.filter(r => r.nivel === 'medio' || r.nivel === 'grave');
+      filtered = filtered.filter(r => r.nivel === 'avancado' || r.nivel === 'extremo');
     } else if (filtroAtivo === 'ultimos-7-dias') {
       const seteDiasAtras = new Date();
       seteDiasAtras.setDate(seteDiasAtras.getDate() - 7);
@@ -244,7 +259,7 @@ export function useMapViewModel() {
   const getFilteredFloodAreas = useCallback(() => {
     if (filtroAtivo === 'bueiros') return [];
     if (filtroAtivo === 'mais-graves') {
-      return savedFloodAreas.filter(fa => fa.nivel === 'medio' || fa.nivel === 'grave');
+      return savedFloodAreas.filter(fa => fa.nivel === 'avancado' || fa.nivel === 'extremo');
     }
     if (filtroAtivo === 'ultimos-7-dias') {
       const seteDiasAtras = new Date();
@@ -328,15 +343,28 @@ export function useMapViewModel() {
     buscarEnderecoParaConfirmacao(userLocation.latitude, userLocation.longitude);
   }, [userLocation, buscarEnderecoParaConfirmacao]);
 
+  const recentralizar = useCallback(() => {
+    if (!userLocation) {
+      pedirPermissaoELocalizacao();
+      return;
+    }
+    const newRegion: Region = {
+      ...userLocation,
+      latitudeDelta: 0.02,
+      longitudeDelta: 0.02,
+    };
+    setMapRegion(newRegion);
+    mapRef.current?.animateToRegion?.(newRegion, 500);
+  }, [userLocation, pedirPermissaoELocalizacao]);
+
   const confirmarLocalAbrirForm = useCallback(() => {
     if (!selectedPoint || loadingConfirmationAddress) return;
     setEndereco(confirmationAddress || '');
     setLoadingAddress(false);
-    setNivel('baixo');
-    setDescricao('');
-    setMidiasUri([]);
+    resetFormState({ preserveAddress: true });
+    setEndereco(confirmationAddress || '');
     setModalVisible(true);
-  }, [selectedPoint, confirmationAddress, loadingConfirmationAddress]);
+  }, [selectedPoint, confirmationAddress, loadingConfirmationAddress, resetFormState]);
 
   const cancelarPin = useCallback(() => {
     setSelectedPoint(null);
@@ -424,9 +452,12 @@ export function useMapViewModel() {
       Alert.alert('Atenção', 'Um polígono precisa de pelo menos 3 pontos.');
       return;
     }
-    
+
+    const orderedCoordinates = ordenarPontosPoligono(drawingCoordinates);
+    setDrawingCoordinates(orderedCoordinates);
+
     // We get the first point to serve as the "logical" central address for the area pin and wait for it
-    const pt = drawingCoordinates[0];
+    const pt = orderedCoordinates[0];
     
     setLoadingConfirmationAddress(true);
     Location.reverseGeocodeAsync({ latitude: pt.latitude, longitude: pt.longitude })
@@ -440,11 +471,10 @@ export function useMapViewModel() {
       .finally(() => {
         setLoadingConfirmationAddress(false);
         setTipo('alagamento'); // Forced visually, or logic could change
-        setDescricao('');
-        setMidiasUri([]);
+        resetFormState({ preserveAddress: true });
         setModalVisible(true);
       });
-  }, [drawingCoordinates]);
+  }, [drawingCoordinates, resetFormState]);
 
   const salvar = useCallback(async () => {
     setSalvando(true);
@@ -458,9 +488,11 @@ export function useMapViewModel() {
       }
 
       if (isDrawing) {
+        const orderedCoordinates = ordenarPontosPoligono(drawingCoordinates);
         const floodArea: FloodArea = {
           id: `flood-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-          coordinates: drawingCoordinates,
+          coordinates: orderedCoordinates,
+          endereco: endereco || 'Endereço não informado',
           nivel,
           descricao: descricao.trim() || '',
           dataHora: new Date().toISOString(),
@@ -495,6 +527,7 @@ export function useMapViewModel() {
            id: `manhole-${Date.now()}-${Math.random().toString(36).slice(2)}`,
            latitude: selectedPoint.latitude,
            longitude: selectedPoint.longitude,
+           endereco: endereco || 'Endereço não informado',
            descricao: descricao.trim() || '',
            dataHora: new Date().toISOString(),
            is_finished: false,
@@ -508,26 +541,30 @@ export function useMapViewModel() {
 
       setModalVisible(false);
       setSelectedPoint(null);
-      setConfirmationAddress('');
+      resetFormState();
+      setDrawingCoordinates([]);
+      setIsDrawing(false);
       setTimeout(() => {
         Alert.alert('Salvo', isDrawing ? 'Área registrada com sucesso.' : 'Reporte registrado no seu celular.');
       }, 500);
+      return true;
     } catch {
       setTimeout(() => {
         Alert.alert('Erro', 'Não foi possível salvar o reporte.');
       }, 500);
+      return false;
     } finally {
       setSalvando(false);
     }
-  }, [selectedPoint, tipo, nivel, descricao, endereco, midiasUri, isDrawing, drawingCoordinates]);
+  }, [selectedPoint, tipo, nivel, descricao, endereco, midiasUri, isDrawing, drawingCoordinates, resetFormState]);
 
   const fecharModal = useCallback(() => {
     setModalVisible(false);
     setSelectedPoint(null);
-    setConfirmationAddress('');
+    resetFormState();
     setIsDrawing(false);
     setDrawingCoordinates([]);
-  }, []);
+  }, [resetFormState]);
 
   return {
     // State
@@ -578,6 +615,7 @@ export function useMapViewModel() {
     getFilteredFloodAreas,
     aoClicarNoMapa,
     usarMinhaLocalizacao,
+    recentralizar,
     confirmarLocalAbrirForm,
     confirmarAreaAbrirForm,
     cancelarPin,

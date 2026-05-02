@@ -3,11 +3,18 @@ import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
 import { useEffect } from 'react';
+import '@/features/reportes/services/IncidentMonitoringService';
 
 import { ThemePreferenceProvider } from '@/core/contexts/theme-preference-context';
 import { useColorScheme } from '@/core/hooks/use-color-scheme';
 import { AuthProvider, useAuth } from '@/core/contexts/auth-context';
 import { View, ActivityIndicator } from 'react-native';
+import {
+  initializeIncidentMonitoring,
+  startIncidentMonitoring,
+  stopIncidentMonitoring,
+  subscribeToIncidentNotificationResponses,
+} from '@/features/reportes/services/IncidentMonitoringService';
 
 export const unstable_settings = {
   anchor: '(tabs)',
@@ -32,6 +39,32 @@ function RootLayoutContent() {
       router.replace('/(tabs)');
     }
   }, [user, isLoading, segments]);
+
+  useEffect(() => {
+    initializeIncidentMonitoring().catch((error) => {
+      console.error('[IncidentMonitoring] init error', error);
+    });
+
+    const subscription = subscribeToIncidentNotificationResponses();
+    return () => {
+      subscription.remove();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (isLoading) return;
+
+    if (!user) {
+      stopIncidentMonitoring().catch((error) => {
+        console.error('[IncidentMonitoring] stop error', error);
+      });
+      return;
+    }
+
+    startIncidentMonitoring().catch((error) => {
+      console.error('[IncidentMonitoring] start error', error);
+    });
+  }, [user, isLoading]);
 
   if (isLoading) {
     return (

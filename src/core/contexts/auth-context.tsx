@@ -1,7 +1,16 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import * as SecureStore from 'expo-secure-store';
-import { API_URL } from '../utils/api';
+import { DeviceEventEmitter } from 'react-native';
 import { decode } from 'base-64';
+import { API_URL } from '../utils/api-config';
+import { refreshAccessToken } from '../utils/refresh-token';
+import {
+  AUTH_SESSION_CLEARED_EVENT,
+  clearSession,
+  getStoredAccessToken,
+  getStoredRefreshToken,
+  getStoredUser,
+  persistSession,
+} from '../utils/session';
 
 type User = {
   id: string;
@@ -37,7 +46,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     const checkSession = async () => {
       try {
-        const token = await SecureStore.getItemAsync('userToken');
+        const token = await getStoredAccessToken();
+        const refreshToken = await getStoredRefreshToken();
+        const storedUser = await getStoredUser();
+
+        if (storedUser && !token && !refreshToken) {
+          await clearSession();
+          setUser(null);
+          return;
+        }
+
+        if (!token && refreshToken) {
+          const refreshedToken = await refreshAccessToken(refreshToken);
+          if (!refreshedToken) {
+            setUser(null);
+            return;
+          }
+        }
+
         if (token) {
           try {
             const payloadBase64 = token.split('.')[1];
@@ -46,25 +72,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               const decodedPayload = JSON.parse(decode(base64));
 
               if (decodedPayload.exp && decodedPayload.exp * 1000 < Date.now()) {
-                console.log('Token expirado. Deslogando localmente...');
-                await SecureStore.deleteItemAsync('userToken');
-                await SecureStore.deleteItemAsync('userData');
-                setUser(null);
-                return;
+                const refreshedToken = await refreshAccessToken();
+                if (!refreshedToken) {
+                  setUser(null);
+                  return;
+                }
               }
             }
           } catch (jwtError) {
             console.error('Erro ao ler JWT', jwtError);
-            await SecureStore.deleteItemAsync('userToken');
-            await SecureStore.deleteItemAsync('userData');
+            await clearSession();
             setUser(null);
             return;
           }
         }
 
-        const storedUser = await SecureStore.getItemAsync('userData');
-        if (storedUser) {
-          setUser(JSON.parse(storedUser));
+        const syncedUser = await getStoredUser();
+        if (syncedUser) {
+          setUser(syncedUser);
+        } else {
+          setUser(null);
         }
       } catch (e) {
         console.error('Failed to load session', e);
@@ -72,11 +99,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setIsLoading(false);
       }
     };
+
     checkSession();
+
+    const subscription = DeviceEventEmitter.addListener(
+      AUTH_SESSION_CLEARED_EVENT,
+      () => {
+        setUser(null);
+      },
+    );
+
+    return () => {
+      subscription.remove();
+    };
   }, []);
 
   const signIn = async (email: string, password?: string) => {
     try {
+      console.log('[Auth][Login] starting login for:', email);
       const resp = await fetch(`${API_URL}/mobile/v1/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -95,6 +135,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       
       data = await resp.json();
+      console.log('[Auth][Login] response payload:', {
+        userId: data.userId,
+        hasAccessToken: Boolean(data.access_token),
+        accessToken: data.access_token ? `${data.access_token.slice(0, 12)}... len=${data.access_token.length}` : 'none',
+        hasRefreshToken: Boolean(data.refresh_token),
+        refreshToken: data.refresh_token ? `${data.refresh_token.slice(0, 8)}... len=${data.refresh_token.length}` : 'none',
+      });
       
       const loggedUser: User = {
         id: data.userId || `user-${Date.now()}`,
@@ -103,9 +150,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         token: data.access_token,
       };
 
-      await SecureStore.setItemAsync('userToken', data.access_token);
-      await SecureStore.setItemAsync('userData', JSON.stringify(loggedUser));
-      setUser(loggedUser);
+      const nextUser = await persistSession({
+        accessToken: data.access_token,
+        refreshToken: data.refresh_token,
+        user: loggedUser,
+      });
+      setUser(nextUser);
     } catch(err) {
       console.error('Erro no SignIn: ', err);
       throw err;
@@ -141,8 +191,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signOut = async () => {
-    await SecureStore.deleteItemAsync('userToken');
-    await SecureStore.deleteItemAsync('userData');
+    const refreshToken = await getStoredRefreshToken();
+
+    if (refreshToken) {
+      try {
+        await fetch(`${API_URL}/mobile/v1/auth/logout`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refreshToken }),
+        });
+      } catch (error) {
+        console.error('Erro ao invalidar refresh token no servidor', error);
+      }
+    }
+
+    await clearSession();
     setUser(null);
   };
 

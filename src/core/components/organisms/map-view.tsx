@@ -1,9 +1,10 @@
 import React from 'react';
-import { Platform, View, StyleSheet } from 'react-native';
-import MapView, { Marker, Polygon, Callout } from 'react-native-maps';
+import { View, StyleSheet } from 'react-native';
+import MapView, { Marker, Polygon, Callout, Circle } from 'react-native-maps';
 import { Text } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import type { TipoReporte, NivelAlagamento, Manhole, FloodArea } from '@/features/reportes/models/Reporte';
+import { ordenarPontosPoligono } from '@/features/reportes/utils/polygon';
 
 export type Region = {
   latitude: number;
@@ -34,10 +35,16 @@ interface MapViewComponentProps {
 
 function getPolygonColors(nivel: NivelAlagamento) {
   switch (nivel) {
-    case 'leve': return { fill: 'rgba(255, 235, 59, 0.4)', stroke: 'rgba(255, 235, 59, 0.8)' }; // Amarelo/Verde
-    case 'medio': return { fill: 'rgba(255, 152, 0, 0.4)', stroke: 'rgba(255, 152, 0, 0.8)' }; // Laranja
-    case 'grave': return { fill: 'rgba(244, 67, 54, 0.4)', stroke: 'rgba(244, 67, 54, 0.8)' }; // Vermelho
-    default: return { fill: 'rgba(0, 0, 0, 0.3)', stroke: 'rgba(0,0,0,0.6)' };
+    case 'baixo':
+      return { fill: 'rgba(52, 199, 89, 0.22)', stroke: '#34C759' };
+    case 'medio':
+      return { fill: 'rgba(255, 184, 0, 0.24)', stroke: '#FFB800' };
+    case 'avancado':
+      return { fill: 'rgba(255, 136, 0, 0.24)', stroke: '#FF8800' };
+    case 'extremo':
+      return { fill: 'rgba(255, 59, 48, 0.24)', stroke: '#FF3B30' };
+    default:
+      return { fill: 'rgba(52, 199, 89, 0.22)', stroke: '#34C759' };
   }
 }
 
@@ -91,45 +98,54 @@ export default function MapViewComponent({
       ))}
 
       {savedManholes.map((m) => (
-        <Marker
-          key={`manhole_${m.id}`}
-          coordinate={{ latitude: m.latitude, longitude: m.longitude }}
-          tracksViewChanges={false}
-          onPress={(e) => { e.stopPropagation(); }}
-        >
-          <View style={styles.customMarkerContainer}>
-            <View style={styles.customMarkerHalo} />
-            <View style={styles.customMarkerCore} />
-          </View>
-          <Callout onPress={() => onCalloutPress?.(m.id, 'bueiro')} tooltip={true}>
-            <View style={styles.calloutWrapper}>
-              <View style={styles.calloutBubble}>
-                <View style={styles.calloutHeader}>
-                  <View style={[styles.calloutIconWrapper, { backgroundColor: '#FFF3E0' }]}>
-                    <Ionicons name="warning" size={18} color="#F57C00" />
-                  </View>
-                  <Text style={styles.calloutTitle}>Bueiro Danificado</Text>
-                </View>
-                <Text style={styles.calloutDesc} numberOfLines={2}>{m.descricao || 'Sem descrição'}</Text>
-                <View style={styles.calloutButton}>
-                  <Text style={styles.calloutButtonText}>Veja mais</Text>
-                </View>
-              </View>
-              <View style={styles.calloutArrow} />
+        <React.Fragment key={`manhole_${m.id}`}>
+          <Circle
+            center={{ latitude: m.latitude, longitude: m.longitude }}
+            radius={50}
+            fillColor="rgba(255, 149, 0, 0.12)"
+            strokeColor="rgba(255, 149, 0, 0.45)"
+            strokeWidth={1}
+          />
+          <Marker
+            coordinate={{ latitude: m.latitude, longitude: m.longitude }}
+            tracksViewChanges={false}
+            onPress={(e) => { e.stopPropagation(); }}
+          >
+            <View style={styles.customMarkerContainer}>
+              <View style={styles.customMarkerHalo} />
+              <View style={styles.customMarkerCore} />
             </View>
-          </Callout>
-        </Marker>
+            <Callout onPress={() => onCalloutPress?.(m.id, 'bueiro')} tooltip={true}>
+              <View style={styles.calloutWrapper}>
+                <View style={styles.calloutBubble}>
+                  <View style={styles.calloutHeader}>
+                    <View style={[styles.calloutIconWrapper, { backgroundColor: '#FFF3E0' }]}>
+                      <Ionicons name="warning" size={18} color="#F57C00" />
+                    </View>
+                    <Text style={styles.calloutTitle}>Bueiro Danificado</Text>
+                  </View>
+                  <Text style={styles.calloutDesc} numberOfLines={2}>{m.descricao || 'Sem descrição'}</Text>
+                  <View style={styles.calloutButton}>
+                    <Text style={styles.calloutButtonText}>Veja mais</Text>
+                  </View>
+                </View>
+                <View style={styles.calloutArrow} />
+              </View>
+            </Callout>
+          </Marker>
+        </React.Fragment>
       ))}
 
       {savedFloodAreas.map((fa) => {
+        const orderedCoordinates = ordenarPontosPoligono(fa.coordinates);
         const { fill, stroke } = getPolygonColors(fa.nivel);
         // Calculate an approximate centroid for the marker
-        const lat = fa.coordinates.reduce((acc, c) => acc + c.latitude, 0) / fa.coordinates.length;
-        const lon = fa.coordinates.reduce((acc, c) => acc + c.longitude, 0) / fa.coordinates.length;
+        const lat = orderedCoordinates.reduce((acc, c) => acc + c.latitude, 0) / orderedCoordinates.length;
+        const lon = orderedCoordinates.reduce((acc, c) => acc + c.longitude, 0) / orderedCoordinates.length;
         return (
           <React.Fragment key={`flood_${fa.id}`}>
             <Polygon
-              coordinates={fa.coordinates}
+              coordinates={orderedCoordinates}
               fillColor={fill}
               strokeColor={stroke}
               strokeWidth={2}
@@ -162,7 +178,7 @@ export default function MapViewComponent({
 
       {drawingCoordinates.length > 0 && (
         <Polygon
-          coordinates={drawingCoordinates}
+          coordinates={ordenarPontosPoligono(drawingCoordinates)}
           fillColor="rgba(0, 150, 255, 0.3)" // Blue for drawing preview
           strokeColor="rgba(0, 150, 255, 0.8)"
           strokeWidth={2}
@@ -179,16 +195,24 @@ export default function MapViewComponent({
       ))}
 
       {selectedPoint && (
-        <Marker
-          coordinate={selectedPoint}
-          title="Novo ponto"
-          // Let it track changes initially if it animates, but usually it's static
-        >
-          <View style={styles.customMarkerContainer}>
-            <View style={[styles.customMarkerHalo, { backgroundColor: 'rgba(255, 59, 48, 0.25)' }]} />
-            <View style={[styles.customMarkerCore, { backgroundColor: '#FF3B30' }]} />
-          </View>
-        </Marker>
+        <>
+          <Circle
+            center={selectedPoint}
+            radius={50}
+            fillColor="rgba(255, 59, 48, 0.12)"
+            strokeColor="rgba(255, 59, 48, 0.45)"
+            strokeWidth={1}
+          />
+          <Marker
+            coordinate={selectedPoint}
+            title="Novo ponto"
+          >
+            <View style={styles.customMarkerContainer}>
+              <View style={[styles.customMarkerHalo, { backgroundColor: 'rgba(255, 59, 48, 0.25)' }]} />
+              <View style={[styles.customMarkerCore, { backgroundColor: '#FF3B30' }]} />
+            </View>
+          </Marker>
+        </>
       )}
     </MapView>
   );

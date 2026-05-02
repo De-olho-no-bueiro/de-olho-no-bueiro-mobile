@@ -90,7 +90,11 @@ export function ProfileScreen() {
           GERENCIAR CONTA
         </ThemedText>
         <View style={[styles.section, { backgroundColor: colors.surface, borderColor: isDark ? '#333' : '#EAF0F6' }]}>
-          <TouchableOpacity style={[styles.row, { borderBottomColor: isDark ? '#333' : '#EAF0F6' }]} activeOpacity={0.7}>
+          <TouchableOpacity
+            style={[styles.row, { borderBottomColor: isDark ? '#333' : '#EAF0F6' }]}
+            activeOpacity={0.7}
+            onPress={() => router.push('/(tabs)/report-history' as any)}
+          >
             <View style={[styles.iconBox, { backgroundColor: isDark ? 'rgba(10, 126, 164, 0.2)' : '#E6F2F7' }]}>
               <IconSymbol name="clock.fill" size={20} color="#0A7EA4" />
             </View>

@@ -2,9 +2,11 @@ import { useRouter } from "expo-router";
 import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
+  Keyboard,
   KeyboardAvoidingView,
   Modal,
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   TextInput,
@@ -16,6 +18,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { IconSymbol } from "@/core/components/atoms/icon-symbol";
 import { ThemedText } from "@/core/components/atoms/themed-text";
 import { ThemedView } from "@/core/components/atoms/themed-view";
+import { SearchDropdown } from "@/core/components/molecules/search-dropdown";
 import { Colors, Layout } from "@/core/constants/theme";
 import { useColorScheme } from "@/core/hooks/use-color-scheme";
 import {
@@ -23,9 +26,9 @@ import {
   useMapViewModel,
 } from "@/features/reportes/viewmodels/useMapViewModel";
 import { Image } from "expo-image";
+import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 
 import MapViewComponent from "@/core/components/organisms/map-view";
-import { Background } from "@react-navigation/elements";
 
 const FILTROS: { key: FiltroOpcao; label: string; icon: string }[] = [
   { key: "todos", label: "Todos", icon: "map" },
@@ -49,7 +52,7 @@ const NIVEL_WAZE_OPTIONS = [
     bgColor: "rgba(52, 199, 89, 0.15)",
   },
   {
-    id: "leve",
+    id: "medio",
     title: "Médio",
     description: "Até o meio da roda do carro",
     icon: "🚙💦",
@@ -57,7 +60,7 @@ const NIVEL_WAZE_OPTIONS = [
     bgColor: "rgba(255, 184, 0, 0.15)",
   },
   {
-    id: "medio",
+    id: "avancado",
     title: "Avançado",
     description: "Até a altura do umbigo de uma pessoa comum",
     icon: "🩳🌊",
@@ -65,7 +68,7 @@ const NIVEL_WAZE_OPTIONS = [
     bgColor: "rgba(255, 136, 0, 0.15)",
   },
   {
-    id: "grave",
+    id: "extremo",
     title: "Extremo",
     description: "Intransponível",
     icon: "🛑⛈️",
@@ -89,6 +92,7 @@ export function MapScreen() {
 
   const handleMapPress = useCallback(
     (e: any) => {
+      Keyboard.dismiss();
       if (vm.isDrawing) {
         vm.aoClicarNoMapa(e);
         return;
@@ -109,6 +113,13 @@ export function MapScreen() {
     setTipoAlerta("idle");
   }, [vm.fecharModal]);
 
+  const handleSalvar = useCallback(async () => {
+    const saved = await vm.salvar();
+    if (saved) {
+      setTipoAlerta("idle");
+    }
+  }, [vm.salvar]);
+
   const handleCancelarDesenho = useCallback(() => {
     vm.toggleDrawingMode();
     setTipoAlerta("enchente");
@@ -121,84 +132,75 @@ export function MapScreen() {
   return (
     <ThemedView style={styles.container}>
       <View style={[styles.searchContainer, { paddingTop: insets.top + 16 }]}>
-        <View
-          style={[
-            styles.searchBar,
-            { backgroundColor: colors.surface },
-            Layout.shadow,
-          ]}
-        >
-          <IconSymbol name="magnifyingglass" size={20} color={colors.icon} />
-          <TextInput
-            style={[styles.searchInput, { color: colors.text }]}
-            placeholder="Buscar bairro ou endereço..."
-            placeholderTextColor={colors.icon}
-            value={vm.searchText}
-            onChangeText={(text) => {
-              vm.setSearchText(text);
-              vm.setSearchError("");
-              vm.buscarSugestoes(text);
-              vm.setShowSuggestions(text.length >= 3);
-            }}
-            onSubmitEditing={vm.buscarPorEndereco}
-            returnKeyType="search"
-            onFocus={() =>
-              vm.searchText.length >= 3 && vm.setShowSuggestions(true)
-            }
-            onBlur={() => setTimeout(() => vm.setShowSuggestions(false), 200)}
-          />
-          {vm.searching ? (
-            <ActivityIndicator size="small" color={colors.tint} />
-          ) : vm.searchText.length > 0 ? (
-            <TouchableOpacity
-              onPress={() => {
-                vm.setSearchText("");
-                vm.setSearchError("");
-                vm.buscarSugestoes("");
-                vm.setShowSuggestions(false);
-              }}
-            >
-              <IconSymbol
-                name="xmark.circle.fill"
-                size={20}
-                color={colors.icon}
-              />
-            </TouchableOpacity>
-          ) : null}
-        </View>
-
-        {vm.showSuggestions && vm.searchSuggestions.length > 0 && (
+        <View style={styles.searchOverlay}>
           <View
             style={[
-              styles.suggestionsContainer,
+              styles.searchBar,
               { backgroundColor: colors.surface },
               Layout.shadow,
             ]}
           >
-            {vm.searchSuggestions.map((addr: any, index: number) => {
-              const addrStr = [
-                addr.street,
-                addr.streetNumber,
-                addr.district,
-                addr.city,
-              ]
-                .filter(Boolean)
-                .join(", ");
-              return (
-                <TouchableOpacity
-                  key={index}
-                  style={[
-                    styles.suggestionItem,
-                    { borderBottomColor: colors.border },
-                  ]}
-                  onPress={() => vm.selecionarSugestao(addr)}
-                >
-                  <ThemedText numberOfLines={1}>{addrStr}</ThemedText>
-                </TouchableOpacity>
-              );
-            })}
+            <IconSymbol name="magnifyingglass" size={20} color={colors.icon} />
+            <TextInput
+              style={[styles.searchInput, { color: colors.text }]}
+              placeholder="Buscar bairro ou endereço..."
+              placeholderTextColor={colors.icon}
+              value={vm.searchText}
+              autoComplete="off"
+              autoCorrect={false}
+              onChangeText={(text) => {
+                vm.setSearchText(text);
+                vm.setSearchError("");
+                vm.buscarSugestoes(text);
+                vm.setShowSuggestions(text.length >= 3);
+              }}
+              onSubmitEditing={() => {
+                Keyboard.dismiss();
+                vm.buscarPorEndereco();
+              }}
+              returnKeyType="search"
+              onFocus={() =>
+                vm.searchText.length >= 3 && vm.setShowSuggestions(true)
+              }
+              onBlur={() => setTimeout(() => vm.setShowSuggestions(false), 200)}
+            />
+            {vm.searching ? (
+              <ActivityIndicator size="small" color={colors.tint} />
+            ) : vm.searchText.length > 0 ? (
+              <TouchableOpacity
+                onPress={() => {
+                  vm.setSearchText("");
+                  vm.setSearchError("");
+                  vm.buscarSugestoes("");
+                  vm.setShowSuggestions(false);
+                }}
+              >
+                <IconSymbol
+                  name="xmark.circle.fill"
+                  size={20}
+                  color={colors.icon}
+                />
+              </TouchableOpacity>
+            ) : null}
           </View>
-        )}
+
+          <SearchDropdown
+            visible={vm.showSuggestions}
+            items={vm.searchSuggestions}
+            backgroundColor={colors.surface}
+            borderColor={colors.border}
+            getKey={(_, index) => `search-${index}`}
+            getLabel={(addr: any) =>
+              [addr.street, addr.streetNumber, addr.district, addr.city]
+                .filter(Boolean)
+                .join(", ") || "Localização encontrada"
+            }
+            onSelect={(item) => {
+              Keyboard.dismiss();
+              vm.selecionarSugestao(item);
+            }}
+          />
+        </View>
 
         {vm.searchError ? (
           <ThemedText style={styles.searchError}>{vm.searchError}</ThemedText>
@@ -274,6 +276,25 @@ export function MapScreen() {
         colors={colors}
         tintColor={colors.tint}
       />
+
+      <TouchableOpacity
+        style={[
+          styles.recenterButton,
+          {
+            backgroundColor: colors.surface,
+            bottom:
+              !vm.isDrawing &&
+              !(vm.selectedPoint && !vm.modalVisible) &&
+              tipoAlerta === "idle"
+                ? 100
+                : 280, // Adjust position based on card height
+          },
+          Layout.shadow,
+        ]}
+        onPress={vm.recentralizar}
+      >
+        <MaterialIcons name="my-location" size={24} color={colors.tint} />
+      </TouchableOpacity>
 
       {vm.loadingLocation && (
         <View
@@ -756,7 +777,7 @@ export function MapScreen() {
 
               <TouchableOpacity
                 style={[styles.salvarButton, { backgroundColor: colors.tint }]}
-                onPress={vm.salvar}
+                onPress={handleSalvar}
                 disabled={vm.salvando}
               >
                 {vm.salvando ? (
@@ -802,25 +823,14 @@ const styles = StyleSheet.create({
     borderRadius: 999, // Pill shape
     gap: 8,
   },
+  searchOverlay: {
+    zIndex: 20,
+    elevation: 5,
+  },
   searchInput: {
     flex: 1,
     fontSize: 16,
     paddingVertical: 0,
-  },
-  suggestionsContainer: {
-    position: "absolute",
-    top: 64,
-    left: 16,
-    right: 16,
-    borderRadius: 16,
-    marginTop: 8,
-    maxHeight: 200,
-    zIndex: 20,
-    overflow: "hidden",
-  },
-  suggestionItem: {
-    padding: 12,
-    borderBottomWidth: 1,
   },
   filtersContainer: {
     marginTop: 12,
@@ -849,6 +859,17 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#e74c3c",
     textAlign: "center",
+  },
+  recenterButton: {
+    position: "absolute",
+    right: 20,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 10,
+    elevation: 4,
   },
   map: {
     flex: 1,

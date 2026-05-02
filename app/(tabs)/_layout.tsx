@@ -46,6 +46,12 @@ export default function TabLayout() {
           href: null,
         }}
       />
+      <Tabs.Screen
+        name="report-history"
+        options={{
+          href: null,
+        }}
+      />
     </Tabs>
   );
 }

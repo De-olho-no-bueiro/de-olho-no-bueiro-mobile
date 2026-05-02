@@ -3,6 +3,22 @@ import { IReporteRepository } from './IReporteRepository';
 import { fetchWithAuth } from '@/core/utils/api';
 import { encode as btoa } from 'base-64';
 
+const normalizeNivel = (nivel?: string): Reporte['nivel'] => {
+  switch (nivel) {
+    case 'leve':
+      return 'medio';
+    case 'grave':
+      return 'extremo';
+    case 'avancado':
+    case 'extremo':
+    case 'medio':
+    case 'baixo':
+      return nivel;
+    default:
+      return 'baixo';
+  }
+};
+
 // Helpers para converter os Bytes[] do PostgreSQL Serializados em Base64 p/ usar no source={{uri}}
 // O Prisma retorna um objeto { type: 'Buffer', data: [...] } quando faz um JSON.stringify do Uint8Array
 const parseBufferToDataUrl = (mediaObj: any): string => {
@@ -16,13 +32,51 @@ const parseBufferToDataUrl = (mediaObj: any): string => {
     for (let i = 0; i < mediaObj.data.length; i += chunkSize) {
       binary += String.fromCharCode.apply(null, mediaObj.data.slice(i, i + chunkSize));
     }
-    // Caso não exista btoa global (Expo), usa require na marra ou assume fallback
     try {
-      const base64 = typeof window !== 'undefined' && window.btoa ? window.btoa(binary) : (global as any).btoa ? (global as any).btoa(binary) : null;
-      if (base64) return `data:image/jpeg;base64,${base64}`;
+      return `data:image/jpeg;base64,${btoa(binary)}`;
     } catch {}
   }
   return '';
+};
+
+const mapPostTypeToTipo = (type?: string): Reporte['tipo'] => (type === 'bueiro' ? 'bueiro' : 'alagamento');
+
+const normalizeAuthorPhoto = (value: any): string | null => {
+  const parsed = parseBufferToDataUrl(value);
+  return parsed || null;
+};
+
+const mapPostToReporte = (d: any): Reporte => {
+  const midiasUri = d.medias && Array.isArray(d.medias) ? d.medias.map(parseBufferToDataUrl).filter(Boolean) : [];
+  const coordinates =
+    d.area && Array.isArray(d.area.latitude) && Array.isArray(d.area.longitude)
+      ? d.area.latitude.map((lat: number, idx: number) => ({
+          latitude: lat,
+          longitude: d.area.longitude[idx],
+        }))
+      : undefined;
+
+  return {
+    id: d.id.toString(),
+    postId: d.id.toString(),
+    tipo: mapPostTypeToTipo(d.type),
+    latitude: d.latitude ?? coordinates?.[0]?.latitude ?? 0,
+    longitude: d.longitude ?? coordinates?.[0]?.longitude ?? 0,
+    endereco: d.endereco || 'Endereço não informado',
+    nivel: normalizeNivel(d.nivel),
+    descricao: d.content || '',
+    fotoUri: midiasUri[0] || null,
+    autor: d.author?.name || 'Usuário',
+    autorFotoUrl: normalizeAuthorPhoto(d.author?.profilePicture),
+    likeCount: d.likeCount ?? 0,
+    likedByMe: Boolean(d.likedByMe),
+    isActive: d.isActive ?? true,
+    negativeReportsCount: d.negativeReportsCount ?? 0,
+    postType: d.type,
+    coordinates,
+    midiasUri,
+    dataHora: d.createdAt,
+  };
 };
 
 export class ApiReporteRepository implements IReporteRepository {
@@ -35,21 +89,7 @@ export class ApiReporteRepository implements IReporteRepository {
       const response = await fetchWithAuth('/mobile/v1/reportes');
       if (!response.ok) return [];
       const data = await response.json();
-      return data.map((d: any) => {
-        const midiasUri = d.medias && Array.isArray(d.medias) ? d.medias.map(parseBufferToDataUrl).filter(Boolean) : [];
-        return {
-          id: d.id.toString(),
-          tipo: d.type || 'alagamento',
-          latitude: d.latitude,
-          longitude: d.longitude,
-          endereco: d.endereco || 'Endereço não informado',
-          nivel: d.nivel || 'baixo',
-          descricao: d.content || '',
-          fotoUri: midiasUri[0] || null, // A primeira foto é usada como thumb legado
-          midiasUri, // Para detalhes ou carousel
-          dataHora: d.createdAt,
-        };
-      });
+      return data.map(mapPostToReporte);
     } catch {
       return [];
     }
@@ -85,7 +125,14 @@ export class ApiReporteRepository implements IReporteRepository {
           postId: postId,
           latitude: d.latitude,
           longitude: d.longitude,
+          endereco: latestPost?.endereco || 'Endereço não informado',
           descricao: latestPost?.content || d.name,
+          autor: latestPost?.author?.name || 'Usuário',
+          autorFotoUrl: normalizeAuthorPhoto(latestPost?.author?.profilePicture),
+          likeCount: latestPost?.likeCount ?? 0,
+          likedByMe: Boolean(latestPost?.likedByMe),
+          isActive: latestPost?.isActive ?? true,
+          negativeReportsCount: latestPost?.negativeReportsCount ?? 0,
           dataHora: d.createdAt,
           is_finished: false,
           midiasUri: midiasParsed,
@@ -131,8 +178,17 @@ export class ApiReporteRepository implements IReporteRepository {
           id: d.id.toString(),
           postId: postId,
           coordinates,
-          nivel: latestPost?.nivel || 'grave',
+          endereco: latestPost?.endereco || 'Endereço não informado',
+          nivel: normalizeNivel(latestPost?.nivel),
           descricao: latestPost?.content || d.name,
+          autor: latestPost?.author?.name || 'Usuário',
+          autorFotoUrl: normalizeAuthorPhoto(latestPost?.author?.profilePicture),
+          latitude: latestPost?.latitude || coordinates[0]?.latitude,
+          longitude: latestPost?.longitude || coordinates[0]?.longitude,
+          likeCount: latestPost?.likeCount ?? 0,
+          likedByMe: Boolean(latestPost?.likedByMe),
+          isActive: latestPost?.isActive ?? true,
+          negativeReportsCount: latestPost?.negativeReportsCount ?? 0,
           dataHora: d.createdAt,
           is_finished: false,
           midiasUri: midiasParsed,
@@ -157,5 +213,97 @@ export class ApiReporteRepository implements IReporteRepository {
 
   async limparTodosReportes(): Promise<void> {
     // Op não aplicável para client via API a não ser que tenha claims de ADMIN
+  }
+
+  async carregarDetalhePost(postId: string): Promise<Reporte | null> {
+    try {
+      const response = await fetchWithAuth(`/mobile/v1/reportes/${postId}`);
+      if (!response.ok) return null;
+      const data = await response.json();
+      return mapPostToReporte(data);
+    } catch {
+      return null;
+    }
+  }
+
+  async toggleLike(postId: string): Promise<{ likedByMe: boolean; likeCount: number } | null> {
+    try {
+      const response = await fetchWithAuth(`/mobile/v1/reportes/${postId}/like`, {
+        method: 'POST',
+      });
+      if (!response.ok) return null;
+      return await response.json();
+    } catch {
+      return null;
+    }
+  }
+
+  async verifyPost(postId: string, isStillHappening: boolean): Promise<Partial<Reporte> | null> {
+    try {
+      const response = await fetchWithAuth(`/mobile/v1/reportes/${postId}/verify`, {
+        method: 'POST',
+        body: JSON.stringify({ isStillHappening }),
+      });
+      if (!response.ok) return null;
+      const data = await response.json();
+      return {
+        isActive: data.isActive,
+        negativeReportsCount: data.negativeReportsCount,
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  async carregarMeuHistorico(): Promise<Reporte[]> {
+    try {
+      const response = await fetchWithAuth('/mobile/v1/reportes/history/me');
+      if (!response.ok) return [];
+      const data = await response.json();
+      return data.map(mapPostToReporte);
+    } catch {
+      return [];
+    }
+  }
+
+  async carregarIncidentesAtivosParaNotificacao(): Promise<
+    { postId: string; latitude: number; longitude: number; tipo: string; endereco: string; descricao: string }[]
+  > {
+    const [reportes, manholes, floodAreas] = await Promise.all([
+      this.carregarReportes(),
+      this.carregarManholes(),
+      this.carregarFloodAreas(),
+    ]);
+
+    return [
+      ...reportes.map((item) => ({
+        postId: item.postId || item.id,
+        latitude: item.latitude,
+        longitude: item.longitude,
+        tipo: item.tipo,
+        endereco: item.endereco,
+        descricao: item.descricao,
+      })),
+      ...manholes
+        .filter((item) => item.postId)
+        .map((item) => ({
+          postId: item.postId!,
+          latitude: item.latitude,
+          longitude: item.longitude,
+          tipo: 'bueiro',
+          endereco: item.endereco || 'Endereço não informado',
+          descricao: item.descricao || '',
+        })),
+      ...floodAreas
+        .filter((item) => item.postId && item.latitude != null && item.longitude != null)
+        .map((item) => ({
+          postId: item.postId!,
+          latitude: item.latitude!,
+          longitude: item.longitude!,
+          tipo: 'alagamento',
+          endereco: item.endereco || 'Endereço não informado',
+          descricao: item.descricao || '',
+        })),
+    ];
   }
 }

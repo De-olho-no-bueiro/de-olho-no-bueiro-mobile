@@ -11,8 +11,11 @@
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "O app precisa da sua localização para marcar pontos de alagamento ou bueiro próximos a você (até 2 km)."
-      }
+        "NSLocationWhenInUseUsageDescription": "O app precisa da sua localização para marcar pontos de alagamento ou bueiro próximos a você (até 2 km).",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "O app usa sua localização em segundo plano para avisar quando você se aproximar de um incidente ativo.",
+        "ITSAppUsesNonExemptEncryption": false
+      },
+      "bundleIdentifier": "com.anonymous.deolhonobueiro"
     },
     "android": {
       "adaptiveIcon": {
@@ -26,9 +29,9 @@
       "permissions": [
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_FINE_LOCATION",
-        "android.permission.RECORD_AUDIO",
-        "android.permission.ACCESS_COARSE_LOCATION",
-        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_BACKGROUND_LOCATION",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_LOCATION",
         "android.permission.RECORD_AUDIO"
       ],
       "package": "com.anonymous.deolhonobueiro"
@@ -51,7 +54,17 @@
           }
         }
       ],
-      "expo-location",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "O app precisa da sua localização para criar reportes próximos a você.",
+          "locationAlwaysAndWhenInUsePermission": "O app usa sua localização em segundo plano para avisar quando você se aproximar de um incidente ativo.",
+          "isIosBackgroundLocationEnabled": true,
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true
+        }
+      ],
+      "expo-notifications",
       [
         "expo-image-picker",
         {
@@ -64,6 +77,12 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "835a6afc-a1ff-4a09-9e45-520bf28811a5"
+      }
     }
   }
 }
