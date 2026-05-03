@@ -2,9 +2,8 @@ import { useCallback, useEffect, useState, useRef } from 'react';
 import { Alert } from 'react-native';
 import * as Location from 'expo-location';
 import * as ImagePicker from 'expo-image-picker';
-import * as FileSystem from 'expo-file-system/legacy';
 
-import type { Reporte, TipoReporte, NivelAlagamento, Manhole, FloodArea } from '@/features/reportes/models/Reporte';
+import type { Reporte, TipoReporte, NivelAlagamento, Manhole, FloodArea, LocalPostMedia } from '@/features/reportes/models/Reporte';
 import { ApiReporteRepository } from '@/features/reportes/services/ApiReporteRepository';
 import { ExpoGeoService } from '@/features/reportes/services/ExpoGeoService';
 import { ordenarPontosPoligono } from '@/features/reportes/utils/polygon';
@@ -35,6 +34,18 @@ function formatarEndereco(addr: Location.LocationGeocodedAddress | null): string
     addr.region,
   ].filter(Boolean);
   return parts.join(', ') || 'Endereço não disponível';
+}
+
+function toLocalPostMedia(asset: ImagePicker.ImagePickerAsset): LocalPostMedia {
+  const extensionFromMime = asset.mimeType?.split('/')[1] || 'jpg';
+  return {
+    uri: asset.uri,
+    fileName: asset.fileName || `image-${Date.now()}.${extensionFromMime}`,
+    mimeType: asset.mimeType || 'image/jpeg',
+    sizeBytes: asset.fileSize || 0,
+    width: asset.width,
+    height: asset.height,
+  };
 }
 
 export function useMapViewModel() {
@@ -70,13 +81,14 @@ export function useMapViewModel() {
   const [tipo, setTipo] = useState<TipoReporte>('alagamento');
   const [nivel, setNivel] = useState<NivelAlagamento>('baixo');
   const [descricao, setDescricao] = useState('');
-  const [midiasUri, setMidiasUri] = useState<string[]>([]);
+  const [selectedMedia, setSelectedMedia] = useState<LocalPostMedia[]>([]);
   const [salvando, setSalvando] = useState(false);
+  const midiasUri = selectedMedia.map((item) => item.uri);
 
   const resetFormState = useCallback((options?: { preserveAddress?: boolean }) => {
     setNivel('baixo');
     setDescricao('');
-    setMidiasUri([]);
+    setSelectedMedia([]);
     if (!options?.preserveAddress) {
       setEndereco('');
     }
@@ -385,7 +397,7 @@ export function useMapViewModel() {
 
   const escolherDaGaleria = useCallback(async () => {
     if (midiasUri.length >= 6) {
-      Alert.alert('Limite atingido', 'Você pode adicionar no máximo 6 fotos/vídeos.');
+      Alert.alert('Limite atingido', 'Você pode adicionar no máximo 6 fotos.');
       return;
     }
 
@@ -396,24 +408,24 @@ export function useMapViewModel() {
     }
 
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images', 'videos'],
+      mediaTypes: ['images'],
       allowsMultipleSelection: true,
       selectionLimit: 6 - midiasUri.length,
       quality: 0.8,
     });
 
     if (!result.canceled) {
-      setMidiasUri(prev => {
+      setSelectedMedia(prev => {
         const remainingSlots = 6 - prev.length;
-        const newUris = result.assets.slice(0, remainingSlots).map(a => a.uri);
-        return [...prev, ...newUris];
+        const newMedia = result.assets.slice(0, remainingSlots).map(toLocalPostMedia);
+        return [...prev, ...newMedia];
       });
     }
   }, [midiasUri.length]);
 
   const tirarFoto = useCallback(async () => {
     if (midiasUri.length >= 6) {
-      Alert.alert('Limite atingido', 'Você pode adicionar no máximo 6 fotos/vídeos.');
+      Alert.alert('Limite atingido', 'Você pode adicionar no máximo 6 fotos.');
       return;
     }
 
@@ -423,20 +435,20 @@ export function useMapViewModel() {
       return;
     }
     const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ['images', 'videos'],
+      mediaTypes: ['images'],
       quality: 0.8,
     });
 
     if (!result.canceled && result.assets && result.assets.length > 0) {
-      setMidiasUri(prev => {
+      setSelectedMedia(prev => {
         if (prev.length >= 6) return prev;
-        return [...prev, result.assets[0].uri];
+        return [...prev, toLocalPostMedia(result.assets[0])];
       });
     }
   }, [midiasUri.length]);
 
   const removerFoto = useCallback((indexToRemove: number) => {
-    setMidiasUri(prev => prev.filter((_, index) => index !== indexToRemove));
+    setSelectedMedia(prev => prev.filter((_, index) => index !== indexToRemove));
   }, []);
 
   const escolherFoto = useCallback(() => {
@@ -479,13 +491,7 @@ export function useMapViewModel() {
   const salvar = useCallback(async () => {
     setSalvando(true);
     try {
-      // 1. Processar mídias nativas (URI) para strings Base64
-      let midiasProcessed: string[] = [];
-      if (midiasUri && midiasUri.length > 0) {
-        midiasProcessed = await Promise.all(
-          midiasUri.map(async (uri) => await FileSystem.readAsStringAsync(uri, { encoding: 'base64' }))
-        );
-      }
+      const uploadedMedia = await reporteRepository.prepararUploads(selectedMedia);
 
       if (isDrawing) {
         const orderedCoordinates = ordenarPontosPoligono(drawingCoordinates);
@@ -498,7 +504,7 @@ export function useMapViewModel() {
           dataHora: new Date().toISOString(),
           is_finished: false,
           midiasUri,
-          midias: midiasProcessed,
+          mediaUploads: uploadedMedia,
         };
         await reporteRepository.adicionarFloodArea(floodArea);
         const atualizados = await reporteRepository.carregarFloodAreas();
@@ -516,7 +522,7 @@ export function useMapViewModel() {
           descricao: descricao.trim() || '',
           fotoUri: midiasUri[0] || null,
           midiasUri,
-          midias: midiasProcessed,
+          mediaUploads: uploadedMedia,
           dataHora: new Date().toISOString(),
         };
         await reporteRepository.adicionarReporte(reporte);
@@ -532,7 +538,7 @@ export function useMapViewModel() {
            dataHora: new Date().toISOString(),
            is_finished: false,
            midiasUri,
-           midias: midiasProcessed,
+           mediaUploads: uploadedMedia,
          };
          await reporteRepository.adicionarManhole(manhole);
          const atualizados = await reporteRepository.carregarManholes();
@@ -548,15 +554,16 @@ export function useMapViewModel() {
         Alert.alert('Salvo', isDrawing ? 'Área registrada com sucesso.' : 'Reporte registrado no seu celular.');
       }, 500);
       return true;
-    } catch {
+    } catch (error: any) {
+      console.error('[Map] erro ao salvar reporte:', error);
       setTimeout(() => {
-        Alert.alert('Erro', 'Não foi possível salvar o reporte.');
+        Alert.alert('Erro', error?.message || 'Não foi possível salvar o reporte.');
       }, 500);
       return false;
     } finally {
       setSalvando(false);
     }
-  }, [selectedPoint, tipo, nivel, descricao, endereco, midiasUri, isDrawing, drawingCoordinates, resetFormState]);
+  }, [selectedPoint, tipo, nivel, descricao, endereco, midiasUri, selectedMedia, isDrawing, drawingCoordinates, resetFormState]);
 
   const fecharModal = useCallback(() => {
     setModalVisible(false);

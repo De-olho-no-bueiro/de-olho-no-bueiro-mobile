@@ -5,8 +5,8 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
+import { Image } from 'expo-image';
 
 import { ThemedText } from '@/core/components/atoms/themed-text';
 import { ThemedView } from '@/core/components/atoms/themed-view';
@@ -36,7 +36,7 @@ export function ProfileScreen() {
   const displayUser = {
     name: user?.name || 'Usuário',
     email: user?.email || '',
-    avatar: 'https://i.pravatar.cc/150?u=' + (user?.name || 'user')
+    profilePicture: user?.profilePicture || null,
   };
 
   return (
@@ -66,9 +66,13 @@ export function ProfileScreen() {
         ]}>
           <View style={styles.profileHeader}>
             <View style={[styles.avatar, { borderColor: isDark ? '#333' : '#E6F2F7', backgroundColor: '#0A7EA4', justifyContent: 'center', alignItems: 'center' }]}>
-              <ThemedText style={{ color: '#fff', fontSize: 24, fontWeight: 'bold' }}>
-                {getInitials(displayUser.name)}
-              </ThemedText>
+              {displayUser.profilePicture ? (
+                <Image source={{ uri: displayUser.profilePicture }} style={styles.avatarImage} contentFit="cover" />
+              ) : (
+                <ThemedText style={{ color: '#fff', fontSize: 24, fontWeight: 'bold' }}>
+                  {getInitials(displayUser.name)}
+                </ThemedText>
+              )}
             </View>
             <View style={styles.profileInfo}>
               <ThemedText style={styles.profileName}>{displayUser.name}</ThemedText>
@@ -178,6 +182,11 @@ const styles = StyleSheet.create({
     height: 72,
     borderRadius: 36,
     borderWidth: 3,
+    overflow: 'hidden',
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
   },
   profileInfo: {
     marginLeft: 16,

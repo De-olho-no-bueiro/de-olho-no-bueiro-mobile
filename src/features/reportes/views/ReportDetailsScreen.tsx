@@ -150,7 +150,6 @@ export function ReportDetailsScreen() {
   const mediaBg = isDark ? '#101114' : '#EEF2F7';
   const authorName = data.autor || 'Cidadão';
   const authorPhoto =
-    data.fotoUrl ||
     data.autorFotoUrl ||
     data.author?.profilePicture ||
     data.profilePicture ||

@@ -1,6 +1,26 @@
 export type TipoReporte = 'alagamento' | 'bueiro';
 export type NivelAlagamento = 'baixo' | 'medio' | 'avancado' | 'extremo';
 
+export interface PostMedia {
+  id?: string;
+  storageKey?: string | null;
+  url: string;
+  mimeType: string;
+  sizeBytes: number;
+  width?: number | null;
+  height?: number | null;
+  position?: number;
+}
+
+export interface LocalPostMedia {
+  uri: string;
+  fileName: string;
+  mimeType: string;
+  sizeBytes: number;
+  width?: number;
+  height?: number;
+}
+
 export interface Reporte {
   id: string;
   postId?: string;
@@ -11,6 +31,7 @@ export interface Reporte {
   nivel: NivelAlagamento;
   descricao: string;
   fotoUri: string | null;
+  fotoUrl?: string | null;
   autor?: string;
   autorFotoUrl?: string | null;
   likeCount?: number;
@@ -20,7 +41,7 @@ export interface Reporte {
   postType?: string;
   coordinates?: { latitude: number; longitude: number }[];
   midiasUri?: string[]; // Arrays nativos de file://
-  midias?: string[];    // Array temporário carregado de Base64 para envio payload
+  mediaUploads?: PostMedia[];
   dataHora: string;
 }
 
@@ -31,6 +52,7 @@ export interface Manhole {
   longitude: number;
   endereco?: string;
   descricao?: string;
+  fotoUrl?: string | null;
   autor?: string;
   autorFotoUrl?: string | null;
   likeCount?: number;
@@ -40,7 +62,7 @@ export interface Manhole {
   dataHora: string;
   is_finished?: boolean;
   midiasUri?: string[];
-  midias?: string[];
+  mediaUploads?: PostMedia[];
 }
 
 export interface FloodArea {
@@ -50,6 +72,7 @@ export interface FloodArea {
   endereco?: string;
   nivel: NivelAlagamento;
   descricao?: string;
+  fotoUrl?: string | null;
   autor?: string;
   autorFotoUrl?: string | null;
   latitude?: number;
@@ -61,7 +84,7 @@ export interface FloodArea {
   dataHora: string;
   is_finished?: boolean;
   midiasUri?: string[];
-  midias?: string[];
+  mediaUploads?: PostMedia[];
 }
 
 export const TIPO_LABELS: Record<TipoReporte, string> = {

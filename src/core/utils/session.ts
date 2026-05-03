@@ -11,6 +11,7 @@ type StoredUser = {
   name: string;
   email: string;
   token?: string;
+  profilePicture?: string | null;
 };
 
 export async function getStoredAccessToken() {
@@ -28,6 +29,19 @@ export async function getStoredRefreshToken() {
 export async function getStoredUser() {
   const storedUser = await SecureStore.getItemAsync(USER_DATA_KEY);
   return storedUser ? (JSON.parse(storedUser) as StoredUser) : null;
+}
+
+export async function updateStoredUser(updater: (current: StoredUser | null) => StoredUser | null) {
+  const currentUser = await getStoredUser();
+  const nextUser = updater(currentUser);
+
+  if (!nextUser) {
+    await SecureStore.deleteItemAsync(USER_DATA_KEY);
+    return null;
+  }
+
+  await SecureStore.setItemAsync(USER_DATA_KEY, JSON.stringify(nextUser));
+  return nextUser;
 }
 
 export async function persistSession(params: {

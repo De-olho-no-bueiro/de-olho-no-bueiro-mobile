@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { DeviceEventEmitter } from 'react-native';
 import { decode } from 'base-64';
 import { API_URL } from '../utils/api-config';
+import { parseProfilePicture } from '../utils/profile-picture';
 import { refreshAccessToken } from '../utils/refresh-token';
 import {
   AUTH_SESSION_CLEARED_EVENT,
@@ -10,6 +11,7 @@ import {
   getStoredRefreshToken,
   getStoredUser,
   persistSession,
+  updateStoredUser,
 } from '../utils/session';
 
 type User = {
@@ -17,6 +19,7 @@ type User = {
   name: string;
   email: string;
   token?: string; 
+  profilePicture?: string | null;
 };
 
 type AuthContextType = {
@@ -25,6 +28,7 @@ type AuthContextType = {
   signIn: (email: string, password?: string) => Promise<void>;
   signUp: (name: string, email: string, password?: string) => Promise<void>;
   signOut: () => Promise<void>;
+  updateProfile: (updates: Partial<Pick<User, 'name' | 'email' | 'profilePicture'>>) => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextType>({
@@ -33,7 +37,21 @@ const AuthContext = createContext<AuthContextType>({
   signIn: async () => {},
   signUp: async () => {},
   signOut: async () => {},
+  updateProfile: async () => {},
 });
+
+async function readResponseBody(resp: Response) {
+  const text = await resp.text();
+  if (!text) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    return text;
+  }
+}
 
 export function useAuth() {
   return useContext(AuthContext);
@@ -125,16 +143,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       let data: any;
       if (!resp.ok) {
-        try {
-          data = await resp.json();
-        } catch {
-          const text = await resp.text();
-          throw new Error(text || 'Credenciais inválidas');
-        }
-        throw new Error(data?.message || 'Credenciais inválidas');
+        data = await readResponseBody(resp);
+        throw new Error(
+          typeof data === 'string' ? data || 'Credenciais inválidas' : data?.message || 'Credenciais inválidas',
+        );
       }
       
-      data = await resp.json();
+      data = await readResponseBody(resp);
       console.log('[Auth][Login] response payload:', {
         userId: data.userId,
         hasAccessToken: Boolean(data.access_token),
@@ -148,6 +163,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         name: data.name || email.split('@')[0],
         email,
         token: data.access_token,
+        profilePicture: parseProfilePicture(data.profilePicture),
       };
 
       const nextUser = await persistSession({
@@ -172,16 +188,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       let data: any;
       if (!resp.ok) {
-        try {
-          data = await resp.json();
-        } catch {
-          const text = await resp.text();
-          throw new Error(text || 'Falha no cadastro');
-        }
-        throw new Error(data?.message || 'Falha no cadastro');
+        data = await readResponseBody(resp);
+        throw new Error(
+          typeof data === 'string' ? data || 'Falha no cadastro' : data?.message || 'Falha no cadastro',
+        );
       }
       
-      data = await resp.json();
+      data = await readResponseBody(resp);
       
       await signIn(email, password || '123');
     } catch(err) {
@@ -209,8 +222,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(null);
   };
 
+  const updateProfile = async (updates: Partial<Pick<User, 'name' | 'email' | 'profilePicture'>>) => {
+    const nextUser = await updateStoredUser((currentUser) => {
+      if (!currentUser) {
+        return null;
+      }
+
+      return {
+        ...currentUser,
+        ...(updates.name ? { name: updates.name } : {}),
+        ...(updates.email ? { email: updates.email } : {}),
+        ...(updates.profilePicture !== undefined ? { profilePicture: updates.profilePicture } : {}),
+      };
+    });
+
+    if (nextUser) {
+      setUser(nextUser);
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, isLoading, signIn, signUp, signOut }}>
+    <AuthContext.Provider value={{ user, isLoading, signIn, signUp, signOut, updateProfile }}>
       {children}
     </AuthContext.Provider>
   );

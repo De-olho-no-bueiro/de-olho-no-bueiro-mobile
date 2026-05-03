@@ -1,4 +1,5 @@
 import { API_URL } from './api-config';
+import { parseProfilePicture } from './profile-picture';
 import {
   clearSession,
   getStoredRefreshToken,
@@ -11,6 +12,7 @@ type RefreshResponse = {
   refresh_token: string;
   userId: number | string;
   name?: string | null;
+  profilePicture?: any;
 };
 
 let refreshPromise: Promise<string | null> | null = null;
@@ -44,6 +46,7 @@ async function runRefresh(refreshToken: string): Promise<string | null> {
       id: String(data.userId ?? storedUser?.id ?? ''),
       name: data.name ?? storedUser?.name ?? '',
       email: storedUser?.email ?? '',
+      profilePicture: parseProfilePicture(data.profilePicture) ?? storedUser?.profilePicture ?? null,
     },
   });
 

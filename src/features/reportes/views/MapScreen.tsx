@@ -746,8 +746,8 @@ export function MapScreen() {
                 <IconSymbol name="camera.fill" size={32} color={colors.icon} />
                 <ThemedText style={styles.fotoLabel}>
                   {vm.midiasUri.length >= 6
-                    ? "Limite de 6 mídias atingido"
-                    : "Anexar foto ou vídeo"}
+                    ? "Limite de 6 fotos atingido"
+                    : "Anexar foto"}
                 </ThemedText>
               </TouchableOpacity>
 
