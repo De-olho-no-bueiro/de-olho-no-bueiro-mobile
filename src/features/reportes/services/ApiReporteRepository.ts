@@ -76,13 +76,15 @@ const normalizeRemoteMedia = (mediaObj: any, position: number): PostMedia | null
   };
 };
 
+const isPostMedia = (media: PostMedia | null): media is PostMedia => media !== null;
+
 const mapPostToReporte = (d: any): Reporte => {
-  const mediaUploads = Array.isArray(d.media)
-    ? d.media.map(normalizeRemoteMedia).filter(Boolean)
+  const mediaUploads: PostMedia[] = Array.isArray(d.media)
+    ? d.media.map(normalizeRemoteMedia).filter(isPostMedia)
     : Array.isArray(d.medias)
-      ? d.medias.map(normalizeRemoteMedia).filter(Boolean)
+      ? d.medias.map(normalizeRemoteMedia).filter(isPostMedia)
       : [];
-  const midiasUri = mediaUploads.map((item) => item!.url);
+  const midiasUri = mediaUploads.map((item) => item.url);
   const coordinates =
     d.area && Array.isArray(d.area.latitude) && Array.isArray(d.area.longitude)
       ? d.area.latitude.map((lat: number, idx: number) => ({
@@ -166,7 +168,7 @@ export class ApiReporteRepository implements IReporteRepository {
         const latestPost = (d.posts && d.posts.length > 0) ? d.posts[0] : null;
         const rawMedias = latestPost?.media || latestPost?.medias || d.media || d.medias;
         const mediaUploads = rawMedias && Array.isArray(rawMedias)
-          ? rawMedias.map(normalizeRemoteMedia).filter(Boolean) as PostMedia[]
+          ? rawMedias.map(normalizeRemoteMedia).filter(isPostMedia)
           : [];
         const midiasParsed = mediaUploads.map((item) => item.url);
         const postId = latestPost ? latestPost.id.toString() : undefined;
@@ -225,7 +227,7 @@ export class ApiReporteRepository implements IReporteRepository {
         const latestPost = (d.posts && d.posts.length > 0) ? d.posts[0] : null;
         const rawMedias = latestPost?.media || latestPost?.medias || d.media || d.medias;
         const mediaUploads = rawMedias && Array.isArray(rawMedias)
-          ? rawMedias.map(normalizeRemoteMedia).filter(Boolean) as PostMedia[]
+          ? rawMedias.map(normalizeRemoteMedia).filter(isPostMedia)
           : [];
         const midiasParsed = mediaUploads.map((item) => item.url);
         const postId = latestPost ? latestPost.id.toString() : undefined;
@@ -282,7 +284,7 @@ export class ApiReporteRepository implements IReporteRepository {
           return item;
         }
 
-        const info = await FileSystem.getInfoAsync(item.uri, { size: true });
+        const info = await FileSystem.getInfoAsync(item.uri);
         return {
           ...item,
           sizeBytes: info.exists && typeof info.size === 'number' ? info.size : 0,

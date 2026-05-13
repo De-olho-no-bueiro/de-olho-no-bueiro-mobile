@@ -21,12 +21,14 @@ import { ThemedView } from '@/core/components/atoms/themed-view';
 import { IconSymbol } from '@/core/components/atoms/icon-symbol';
 import { Feather } from '@expo/vector-icons';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { useColorScheme } from '@/core/hooks/use-color-scheme';
 import { Colors } from '@/core/constants/theme';
 import { useReportDetailsViewModel } from '../viewmodels/useReportDetailsViewModel';
 import { detailsStyles as styles } from './styles/detailsStyles';
 import { useAuth } from '@/core/contexts/auth-context';
 import type { Comment } from '@/features/reportes/services/ApiCommentRepository';
+import { getMediaUrl } from '@/core/utils/api-config';
 
 const { width } = Dimensions.get('window');
 const POST_CARD_HORIZONTAL_MARGIN = 12;
@@ -60,9 +62,10 @@ export function ReportDetailsScreen() {
   const [newComment, setNewComment] = useState('');
   const [currentPage, setCurrentPage] = useState(0);
   const [editingComment, setEditingComment] = useState<Comment | null>(null);
+  const canSubmitComment = Boolean(newComment.trim()) && !vm.commentSubmitting;
 
   const handleSendComment = async () => {
-    if (!newComment.trim()) return;
+    if (!newComment.trim() || vm.commentSubmitting) return;
     Keyboard.dismiss();
     if (editingComment) {
       const updated = await vm.editarComentario(editingComment.id, newComment.trim());
@@ -72,8 +75,10 @@ export function ReportDetailsScreen() {
       }
       return;
     }
-    await vm.enviarComentario(newComment.trim());
-    setNewComment('');
+    const created = await vm.enviarComentario(newComment.trim());
+    if (created) {
+      setNewComment('');
+    }
   };
 
   const handleLike = async () => {
@@ -105,7 +110,8 @@ export function ReportDetailsScreen() {
   const levelConfig = LEVEL_CONFIG[nivelKey] || LEVEL_CONFIG.baixo;
   const images = [data.fotoUri, ...(Array.isArray(data.midiasUri) ? data.midiasUri : [])]
     .filter((uri): uri is string => typeof uri === 'string' && uri.trim().length > 0)
-    .filter((uri, index, arr) => arr.indexOf(uri) === index);
+    .filter((uri, index, arr) => arr.indexOf(uri) === index)
+    .map(uri => getMediaUrl(uri));
   const hasImages = images.length > 0;
   const imageCount = images.length;
   const liked = Boolean(data.likedByMe);
@@ -149,11 +155,12 @@ export function ReportDetailsScreen() {
   const placeholderColor = isDark ? '#636366' : '#9CA3AF';
   const mediaBg = isDark ? '#101114' : '#EEF2F7';
   const authorName = data.autor || 'Cidadão';
-  const authorPhoto =
+  const rawAuthorPhoto =
     data.autorFotoUrl ||
     data.author?.profilePicture ||
     data.profilePicture ||
     null;
+  const authorPhoto = rawAuthorPhoto ? getMediaUrl(rawAuthorPhoto) : null;
   const typeColor = tipo === 'alagamento' ? '#1A73E8' : '#F57C00';
   const typeBg = tipo === 'alagamento' ? 'rgba(26, 115, 232, 0.12)' : 'rgba(245, 124, 0, 0.14)';
   const typeLabel = tipo === 'alagamento' ? 'Alagamento' : 'Bueiro Danificado';
@@ -219,8 +226,8 @@ export function ReportDetailsScreen() {
   return (
     <KeyboardAvoidingView
       style={[styles.container, { backgroundColor: themeColors.background }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={0}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={insets.top}
     >
       <ThemedView style={styles.safeArea}>
         <TouchableOpacity
@@ -242,6 +249,7 @@ export function ReportDetailsScreen() {
             bounces={false}
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
           >
             <View style={[styles.postCard, { backgroundColor: cardBg, borderColor, marginTop: insets.top + 64 }]}>
               <View style={styles.headerSection}>
@@ -286,55 +294,59 @@ export function ReportDetailsScreen() {
               </View>
 
               <View style={[styles.mediaContainer, { backgroundColor: mediaBg, height: MEDIA_HEIGHT }]}>
-                <ScrollView
-                  horizontal
-                  pagingEnabled
-                  showsHorizontalScrollIndicator={false}
-                  scrollEnabled={imageCount > 1}
-                  style={styles.mediaScroll}
-                  onMomentumScrollEnd={(e) => {
-                    const page = Math.round(e.nativeEvent.contentOffset.x / POST_CARD_WIDTH);
-                    setCurrentPage(page);
-                  }}
-                >
-                  {hasImages ? (
-                    images.map((uri: string, index: number) => (
-                      <Image
-                        key={`${uri}-${index}`}
-                        source={{ uri }}
-                        style={[styles.mediaImage, { width: POST_CARD_WIDTH, height: MEDIA_HEIGHT }]}
-                        contentFit="cover"
-                      />
-                    ))
-                  ) : (
-                    <View style={[styles.mediaPlaceholder, { width: POST_CARD_WIDTH, backgroundColor: mediaBg, height: MEDIA_HEIGHT }]}>
-                      <MaterialIcons name="landscape" size={92} color={isDark ? '#4B5563' : '#9CA3AF'} />
-                    </View>
-                  )}
-                </ScrollView>
-
-                {imageCount > 1 && (
+                {hasImages ? (
                   <>
-                    <View style={styles.mediaCounter}>
-                      <IconSymbol name="photo.fill" size={14} color="#FFF" style={styles.mediaCounterIcon} />
-                      <ThemedText style={styles.mediaCounterText}>
-                        {currentPage + 1}/{imageCount}
-                      </ThemedText>
-                    </View>
-
-                    <View style={styles.dotsContainer}>
-                      {images.map((_: string, index: number) => (
-                        <View
-                          key={index}
-                          style={[
-                            styles.dot,
-                            { backgroundColor: isDark ? 'rgba(255,255,255,0.35)' : 'rgba(17,24,39,0.22)' },
-                            index === currentPage && [styles.dotActive, { backgroundColor: '#FFFFFF' }],
-                          ]}
+                    <ScrollView
+                      horizontal
+                      pagingEnabled
+                      showsHorizontalScrollIndicator={false}
+                      scrollEnabled={imageCount > 1}
+                      style={styles.mediaScroll}
+                      keyboardShouldPersistTaps="handled"
+                      onMomentumScrollEnd={(e) => {
+                        const pageWidth = e.nativeEvent.layoutMeasurement.width || 1;
+                        const page = Math.round(e.nativeEvent.contentOffset.x / pageWidth);
+                        setCurrentPage(page);
+                      }}
+                    >
+                      {images.map((uri: string, index: number) => (
+                        <Image
+                          key={`${uri}-${index}`}
+                          source={{ uri }}
+                          style={[styles.mediaImage, { height: MEDIA_HEIGHT, width: POST_CARD_WIDTH }]}
+                          contentFit="cover"
                         />
                       ))}
-                    </View>
+                    </ScrollView>
+
+                    {imageCount > 1 && (
+                      <>
+                        <View style={styles.mediaCounter}>
+                          <IconSymbol name="photo.fill" size={14} color="#FFF" style={styles.mediaCounterIcon} />
+                          <ThemedText style={styles.mediaCounterText}>
+                            {currentPage + 1}/{imageCount}
+                          </ThemedText>
+                        </View>
+
+                        <View style={styles.dotsContainer}>
+                          {images.map((_: string, index: number) => (
+                            <View
+                              key={index}
+                              style={[
+                                styles.dot,
+                                { backgroundColor: isDark ? 'rgba(255,255,255,0.35)' : 'rgba(17,24,39,0.22)' },
+                                index === currentPage && [styles.dotActive, { backgroundColor: '#FFFFFF' }],
+                              ]}
+                            />
+                          ))}
+                        </View>
+                      </>
+                    )}
                   </>
+                ) : (
+                  <View style={[styles.mediaPlaceholder, { backgroundColor: mediaBg, height: MEDIA_HEIGHT }]}>
+                    <MaterialIcons name="landscape" size={92} color={isDark ? '#4B5563' : '#9CA3AF'} />
+                  </View>
                 )}
               </View>
 
@@ -366,7 +378,7 @@ export function ReportDetailsScreen() {
 
                 {showVerificationPrompt ? (
                   <Pressable style={styles.actionButton} onPress={handleVerify}>
-                    <IconSymbol name="checkmark.seal" size={22} color={textPrimary} />
+                    <MaterialCommunityIcons name="shield-alert" size={22} color={textPrimary} />
                     <ThemedText style={[styles.actionLabel, { color: textPrimary }]}>
                       Verificar
                     </ThemedText>
@@ -421,7 +433,8 @@ export function ReportDetailsScreen() {
                     comments.map((c) => {
                       const commentAuthor = c.author?.name || 'Usuário';
                       const initial = commentAuthor.charAt(0).toUpperCase();
-                      const commentAvatar = c.author?.profilePicture || null;
+                      const commentAvatarRaw = c.author?.profilePicture || null;
+                      const commentAvatar = commentAvatarRaw ? getMediaUrl(commentAvatarRaw) : null;
                       const isOwnComment = String(c.authorId) === String(user?.id);
 
                       return (
@@ -490,16 +503,22 @@ export function ReportDetailsScreen() {
                 onChangeText={setNewComment}
                 multiline
                 maxLength={250}
+                editable={!vm.commentSubmitting}
+                textAlignVertical="top"
               />
               <TouchableOpacity
                 style={[
                   styles.commentSubmitButton,
-                  !newComment.trim() && styles.commentSubmitButtonDisabled,
+                  !canSubmitComment && styles.commentSubmitButtonDisabled,
                 ]}
                 onPress={handleSendComment}
-                disabled={!newComment.trim()}
+                disabled={!canSubmitComment}
               >
-                <IconSymbol name={editingComment ? 'checkmark' : 'paperplane.fill'} size={18} color="#FFF" />
+                {vm.commentSubmitting ? (
+                  <ActivityIndicator size="small" color="#FFF" />
+                ) : (
+                  <IconSymbol name={editingComment ? 'checkmark' : 'paperplane.fill'} size={18} color="#FFF" />
+                )}
               </TouchableOpacity>
             </View>
           </View>

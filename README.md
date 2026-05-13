@@ -1,50 +1,59 @@
-# Welcome to your Expo app 👋
+# de-olho-no-bueiro
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Aplicativo mobile em Expo/React Native com projeto Android nativo já presente em `android/`.
 
-## Get started
+## Requisitos para build local Android
 
-1. Install dependencies
+- Node.js 20.x
+- Java 21
+- Android SDK em `~/Android/Sdk` ou via `ANDROID_HOME`
+- Pacotes do SDK:
+  - `platforms;android-36`
+  - `build-tools;36.0.0`
+  - `platform-tools`
+  - `ndk;27.1.12297006`
 
-   ```bash
-   npm install
-   ```
+## Configuração do ambiente
 
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+Se o Android SDK estiver no caminho padrão `~/Android/Sdk`, o script do projeto já exporta:
 
 ```bash
-npm run reset-project
+ANDROID_HOME=$HOME/Android/Sdk
+ANDROID_SDK_ROOT=$HOME/Android/Sdk
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+Se o seu SDK estiver em outro local, exporte as variáveis antes de rodar o build.
 
-## Learn more
+## Comandos úteis
 
-To learn more about developing your project with Expo, look at the following resources:
+Instalar dependências:
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+```bash
+npm install
+```
 
-## Join the community
+Validar o projeto:
 
-Join our community of developers creating universal apps.
+```bash
+npx tsc --noEmit
+npm run lint
+npx expo-doctor
+```
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+Gerar APK local:
+
+```bash
+./scripts/android-local-build.sh debug
+./scripts/android-local-build.sh release
+```
+
+Saídas esperadas:
+
+- Debug: `android/app/build/outputs/apk/debug/app-debug.apk`
+- Release: `android/app/build/outputs/apk/release/app-release.apk`
+
+## Observações
+
+- O build `release` atual gera um APK de teste assinado com o `debug.keystore`.
+- Para distribuição real, substitua a assinatura de release por um keystore próprio.
+- Os assets em `assets/images/` são placeholders sincronizados com a configuração do Expo. Troque-os pelos arquivos finais quando a identidade visual estiver pronta.

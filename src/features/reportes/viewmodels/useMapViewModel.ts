@@ -112,7 +112,7 @@ export function useMapViewModel() {
         latitude: loc.coords.latitude,
         longitude: loc.coords.longitude,
       });
-    } catch (e) {
+    } catch {
       Alert.alert('Erro', 'Não foi possível obter sua localização.');
     } finally {
       setLoadingLocation(false);
@@ -336,7 +336,7 @@ export function useMapViewModel() {
       setSelectedPoint({ latitude, longitude });
       buscarEnderecoParaConfirmacao(latitude, longitude);
     },
-    [userLocation, buscarEnderecoParaConfirmacao, isDrawing]
+    [userLocation, buscarEnderecoParaConfirmacao, isDrawing, savedFloodAreas]
   );
 
   const usarMinhaLocalizacao = useCallback(() => {
@@ -492,6 +492,7 @@ export function useMapViewModel() {
     setSalvando(true);
     try {
       const uploadedMedia = await reporteRepository.prepararUploads(selectedMedia);
+      let successMessage = 'Reporte enviado com sucesso.';
 
       if (isDrawing) {
         const orderedCoordinates = ordenarPontosPoligono(drawingCoordinates);
@@ -511,6 +512,7 @@ export function useMapViewModel() {
         setSavedFloodAreas(atualizados);
         setIsDrawing(false);
         setDrawingCoordinates([]);
+        successMessage = 'Área de alagamento enviada com sucesso.';
       } else if (selectedPoint && tipo === 'alagamento') {
         const reporte: Reporte = {
           id: `report-${Date.now()}-${Math.random().toString(36).slice(2)}`,
@@ -528,6 +530,7 @@ export function useMapViewModel() {
         await reporteRepository.adicionarReporte(reporte);
         const atualizados = await reporteRepository.carregarReportes();
         setSavedReportes(atualizados);
+        successMessage = 'Alagamento enviado com sucesso.';
       } else if (selectedPoint && tipo === 'bueiro') {
          const manhole: Manhole = {
            id: `manhole-${Date.now()}-${Math.random().toString(36).slice(2)}`,
@@ -543,6 +546,7 @@ export function useMapViewModel() {
          await reporteRepository.adicionarManhole(manhole);
          const atualizados = await reporteRepository.carregarManholes();
          setSavedManholes(atualizados);
+         successMessage = 'Bueiro enviado com sucesso.';
       }
 
       setModalVisible(false);
@@ -551,7 +555,7 @@ export function useMapViewModel() {
       setDrawingCoordinates([]);
       setIsDrawing(false);
       setTimeout(() => {
-        Alert.alert('Salvo', isDrawing ? 'Área registrada com sucesso.' : 'Reporte registrado no seu celular.');
+        Alert.alert('Sucesso', successMessage);
       }, 500);
       return true;
     } catch (error: any) {

@@ -11,6 +11,7 @@ import { Image } from 'expo-image';
 import { ThemedText } from '@/core/components/atoms/themed-text';
 import { ThemedView } from '@/core/components/atoms/themed-view';
 import { IconSymbol } from '@/core/components/atoms/icon-symbol';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useColorScheme } from '@/core/hooks/use-color-scheme';
 import { Colors } from '@/core/constants/theme';
 import { useAuth } from '@/core/contexts/auth-context';
@@ -133,7 +134,7 @@ export function ProfileScreen() {
             onPress={signOut}
           >
             <View style={[styles.iconBox, { backgroundColor: isDark ? 'rgba(239, 68, 68, 0.2)' : '#FEE2E2' }]}>
-              <IconSymbol name="arrow.right.square.fill" size={20} color={isDark ? '#F87171' : '#EF4444'} />
+              <MaterialIcons name="logout" size={20} color={isDark ? '#F87171' : '#EF4444'} />
             </View>
             <ThemedText style={[styles.rowLabel, { color: isDark ? '#F87171' : '#EF4444' }]}>Sair da conta</ThemedText>
           </TouchableOpacity>

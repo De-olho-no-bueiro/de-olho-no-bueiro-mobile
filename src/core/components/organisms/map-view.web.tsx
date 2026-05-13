@@ -12,13 +12,13 @@ interface MapViewComponentProps {
   mapRef: any;
   region?: Region;
   onPress: (e: { nativeEvent: { coordinate: { latitude: number; longitude: number } } }) => void;
-  savedReportes: Array<{
+  savedReportes: {
     id: string;
     tipo: string;
     latitude: number;
     longitude: number;
     endereco: string;
-  }>;
+  }[];
   selectedPoint: { latitude: number; longitude: number } | null;
   colors: any;
   tintColor?: string;

@@ -6,7 +6,6 @@ import {
   KeyboardAvoidingView,
   Modal,
   Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
   TextInput,
@@ -101,29 +100,29 @@ export function MapScreen() {
         vm.aoClicarNoMapa(e);
       }
     },
-    [vm.isDrawing, vm.aoClicarNoMapa, tipoAlerta],
+    [vm, tipoAlerta],
   );
 
   const handleCancelarPin = useCallback(() => {
     vm.cancelarPin();
-  }, [vm.cancelarPin]);
+  }, [vm]);
 
   const handleFecharModal = useCallback(() => {
     vm.fecharModal();
     setTipoAlerta("idle");
-  }, [vm.fecharModal]);
+  }, [vm]);
 
   const handleSalvar = useCallback(async () => {
     const saved = await vm.salvar();
     if (saved) {
       setTipoAlerta("idle");
     }
-  }, [vm.salvar]);
+  }, [vm]);
 
   const handleCancelarDesenho = useCallback(() => {
     vm.toggleDrawingMode();
     setTipoAlerta("enchente");
-  }, [vm.toggleDrawingMode]);
+  }, [vm]);
 
   const loadingOverlayBg = isDark
     ? "rgba(0,0,0,0.75)"

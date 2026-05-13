@@ -11,7 +11,7 @@ export const detailsStyles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: 120,
+    paddingBottom: 24,
   },
   centeredState: {
     justifyContent: 'center',
@@ -132,8 +132,11 @@ export const detailsStyles = StyleSheet.create({
   },
   mediaImage: {
     width: '100%',
+    flex: 1,
   },
   mediaPlaceholder: {
+    width: '100%',
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -330,10 +333,6 @@ export const detailsStyles = StyleSheet.create({
     textAlign: 'center',
   },
   commentInputWrapper: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderTopWidth: 1,
