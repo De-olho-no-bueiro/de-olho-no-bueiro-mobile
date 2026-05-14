@@ -3,6 +3,24 @@ import { useLocalSearchParams } from 'expo-router';
 import { ApiReporteRepository } from '@/features/reportes/services/ApiReporteRepository';
 import { ApiCommentRepository, Comment } from '@/features/reportes/services/ApiCommentRepository';
 
+function isLocalOnlyId(id: string): boolean {
+  return /^(report|manhole|flood)-/.test(id);
+}
+
+function resolveVerificationTargetId(data: any, postIdParam?: string): string | null {
+  const preferredId = data?.postId || postIdParam;
+  if (preferredId) {
+    return String(preferredId);
+  }
+
+  const fallbackId = data?.id ? String(data.id) : '';
+  if (!fallbackId || isLocalOnlyId(fallbackId)) {
+    return null;
+  }
+
+  return fallbackId;
+}
+
 export function useReportDetailsViewModel() {
   const params = useLocalSearchParams();
   const id = params.id as string;
@@ -13,6 +31,7 @@ export function useReportDetailsViewModel() {
   const [data, setData] = useState<any>(null);
   const [comments, setComments] = useState<Comment[]>([]);
   const [liking, setLiking] = useState(false);
+  const [verifying, setVerifying] = useState(false);
   const [commentSubmitting, setCommentSubmitting] = useState(false);
   const commentRepoRef = useRef(new ApiCommentRepository());
   const reporteRepoRef = useRef(new ApiReporteRepository());
@@ -115,13 +134,20 @@ export function useReportDetailsViewModel() {
 
   const verificarIncidente = async (isStillHappening: boolean) => {
     if (!data) return false;
-    const targetPostId = String(data.postId || postIdParam || data.id);
-    const result = await reporteRepoRef.current.verifyPost(targetPostId, isStillHappening);
-    if (result) {
-      setData((prev: any) => prev ? { ...prev, ...result } : prev);
-      return true;
+    const targetPostId = resolveVerificationTargetId(data, postIdParam);
+    if (!targetPostId) return false;
+
+    setVerifying(true);
+    try {
+      const result = await reporteRepoRef.current.verifyPost(targetPostId, isStillHappening);
+      if (result) {
+        setData((prev: any) => prev ? { ...prev, ...result } : prev);
+        return true;
+      }
+      return false;
+    } finally {
+      setVerifying(false);
     }
-    return false;
   };
 
   return {
@@ -132,7 +158,9 @@ export function useReportDetailsViewModel() {
     data,
     comments,
     liking,
+    verifying,
     commentSubmitting,
+    verificationTargetId: resolveVerificationTargetId(data, postIdParam),
     enviarComentario,
     editarComentario,
     excluirComentario,

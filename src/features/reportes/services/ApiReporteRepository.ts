@@ -3,6 +3,20 @@ import { Reporte, Manhole, FloodArea, LocalPostMedia, PostMedia } from '@/featur
 import { IReporteRepository } from './IReporteRepository';
 import { fetchWithAuth } from '@/core/utils/api';
 import { encode as btoa } from 'base-64';
+import { isWeb } from '@/core/utils/platform-capabilities';
+import {
+  cacheFloodAreas,
+  cacheHistory,
+  cacheManholes,
+  cacheReportes,
+  enqueuePendingSubmission,
+  getCachedFloodAreas,
+  getCachedHistory,
+  getCachedManholes,
+  getCachedReportes,
+  getPendingSubmissions,
+  removePendingSubmission,
+} from './OfflineReporteQueue';
 
 const normalizeNivel = (nivel?: string): Reporte['nivel'] => {
   switch (nivel) {
@@ -77,6 +91,26 @@ const normalizeRemoteMedia = (mediaObj: any, position: number): PostMedia | null
 };
 
 const isPostMedia = (media: PostMedia | null): media is PostMedia => media !== null;
+const isBrowserOffline = () =>
+  isWeb && typeof navigator !== 'undefined' && navigator.onLine === false;
+
+function dedupeById<T extends { id?: string; postId?: string }>(items: T[]) {
+  const seen = new Set<string>();
+
+  return items.filter((item) => {
+    const key = item.postId || item.id;
+    if (!key) {
+      return true;
+    }
+
+    if (seen.has(key)) {
+      return false;
+    }
+
+    seen.add(key);
+    return true;
+  });
+}
 
 const mapPostToReporte = (d: any): Reporte => {
   const mediaUploads: PostMedia[] = Array.isArray(d.media)
@@ -137,23 +171,37 @@ export class ApiReporteRepository implements IReporteRepository {
   async carregarReportes(): Promise<Reporte[]> {
     try {
       const response = await fetchWithAuth('/mobile/v1/reportes');
-      if (!response.ok) return [];
+      if (!response.ok) return getCachedReportes();
       const data = await response.json();
-      return data.map(mapPostToReporte);
+      const mapped = data.map(mapPostToReporte);
+      const merged = dedupeById([...(await getCachedReportes()), ...mapped]);
+      await cacheReportes(merged);
+      return merged;
     } catch {
-      return [];
+      return getCachedReportes();
     }
   }
 
   async adicionarReporte(reporte: Reporte): Promise<void> {
-    const response = await fetchWithAuth('/mobile/v1/reportes', {
-      method: 'POST',
-      body: JSON.stringify(reporte)
-    });
-    if (!response.ok) {
-      const errText = await response.text();
-      console.error(`[API] Erro ao adicionar reporte. Status: ${response.status}. Detalhes:`, errText);
-      throw new Error(`Falha ao adicionar reporte (Status ${response.status})`);
+    if (isBrowserOffline()) {
+      await enqueuePendingSubmission({ kind: 'reporte', payload: reporte });
+      await cacheReportes(dedupeById([reporte, ...(await getCachedReportes())]));
+      return;
+    }
+
+    try {
+      const response = await fetchWithAuth('/mobile/v1/reportes', {
+        method: 'POST',
+        body: JSON.stringify(reporte)
+      });
+      if (!response.ok) {
+        const errText = await response.text();
+        console.error(`[API] Erro ao adicionar reporte. Status: ${response.status}. Detalhes:`, errText);
+        throw new Error(`Falha ao adicionar reporte (Status ${response.status})`);
+      }
+    } catch {
+      await enqueuePendingSubmission({ kind: 'reporte', payload: reporte });
+      await cacheReportes(dedupeById([reporte, ...(await getCachedReportes())]));
     }
   }
 
@@ -162,9 +210,9 @@ export class ApiReporteRepository implements IReporteRepository {
   async carregarManholes(): Promise<Manhole[]> {
     try {
       const response = await fetchWithAuth('/mobile/v1/manholes');
-      if (!response.ok) return [];
+      if (!response.ok) return getCachedManholes();
       const data = await response.json();
-      return data.map((d: any) => {
+      const mapped = data.map((d: any) => {
         const latestPost = (d.posts && d.posts.length > 0) ? d.posts[0] : null;
         const rawMedias = latestPost?.media || latestPost?.medias || d.media || d.medias;
         const mediaUploads = rawMedias && Array.isArray(rawMedias)
@@ -193,20 +241,34 @@ export class ApiReporteRepository implements IReporteRepository {
           mediaUploads,
         };
       });
+      const merged = dedupeById([...(await getCachedManholes()), ...mapped]);
+      await cacheManholes(merged);
+      return merged;
     } catch {
-      return [];
+      return getCachedManholes();
     }
   }
 
   async adicionarManhole(manhole: Manhole): Promise<void> {
-    const response = await fetchWithAuth('/mobile/v1/manholes', {
-      method: 'POST',
-      body: JSON.stringify(manhole)
-    });
-    if (!response.ok) {
-      const errText = await response.text();
-      console.error(`[API] Erro ao adicionar bueiro. Status: ${response.status}. Detalhes:`, errText);
-      throw new Error(`Falha ao adicionar bueiro (Status ${response.status})`);
+    if (isBrowserOffline()) {
+      await enqueuePendingSubmission({ kind: 'manhole', payload: manhole });
+      await cacheManholes(dedupeById([manhole, ...(await getCachedManholes())]));
+      return;
+    }
+
+    try {
+      const response = await fetchWithAuth('/mobile/v1/manholes', {
+        method: 'POST',
+        body: JSON.stringify(manhole)
+      });
+      if (!response.ok) {
+        const errText = await response.text();
+        console.error(`[API] Erro ao adicionar bueiro. Status: ${response.status}. Detalhes:`, errText);
+        throw new Error(`Falha ao adicionar bueiro (Status ${response.status})`);
+      }
+    } catch {
+      await enqueuePendingSubmission({ kind: 'manhole', payload: manhole });
+      await cacheManholes(dedupeById([manhole, ...(await getCachedManholes())]));
     }
   }
 
@@ -215,9 +277,9 @@ export class ApiReporteRepository implements IReporteRepository {
   async carregarFloodAreas(): Promise<FloodArea[]> {
     try {
       const response = await fetchWithAuth('/mobile/v1/flood-areas');
-      if (!response.ok) return [];
+      if (!response.ok) return getCachedFloodAreas();
       const data = await response.json();
-      return data.map((d: any) => {
+      const mapped = data.map((d: any) => {
         // Converte os vetores unificados de latitude/longitude de volta em pt
         const coordinates = (d.latitude || []).map((lat: number, idx: number) => ({
           latitude: lat,
@@ -254,20 +316,34 @@ export class ApiReporteRepository implements IReporteRepository {
           mediaUploads,
         };
       });
+      const merged = dedupeById([...(await getCachedFloodAreas()), ...mapped]);
+      await cacheFloodAreas(merged);
+      return merged;
     } catch {
-      return [];
+      return getCachedFloodAreas();
     }
   }
 
   async adicionarFloodArea(area: FloodArea): Promise<void> {
-    const response = await fetchWithAuth('/mobile/v1/flood-areas', {
-      method: 'POST',
-      body: JSON.stringify(area)
-    });
-    if (!response.ok) {
-      const errText = await response.text();
-      console.error(`[API] Erro ao adicionar área de alagamento. Status: ${response.status}. Detalhes:`, errText);
-      throw new Error(`Falha ao adicionar área de alagamento (Status ${response.status})`);
+    if (isBrowserOffline()) {
+      await enqueuePendingSubmission({ kind: 'floodArea', payload: area });
+      await cacheFloodAreas(dedupeById([area, ...(await getCachedFloodAreas())]));
+      return;
+    }
+
+    try {
+      const response = await fetchWithAuth('/mobile/v1/flood-areas', {
+        method: 'POST',
+        body: JSON.stringify(area)
+      });
+      if (!response.ok) {
+        const errText = await response.text();
+        console.error(`[API] Erro ao adicionar área de alagamento. Status: ${response.status}. Detalhes:`, errText);
+        throw new Error(`Falha ao adicionar área de alagamento (Status ${response.status})`);
+      }
+    } catch {
+      await enqueuePendingSubmission({ kind: 'floodArea', payload: area });
+      await cacheFloodAreas(dedupeById([area, ...(await getCachedFloodAreas())]));
     }
   }
 
@@ -277,6 +353,9 @@ export class ApiReporteRepository implements IReporteRepository {
 
   async prepararUploads(midias: LocalPostMedia[]): Promise<PostMedia[]> {
     if (!Array.isArray(midias) || midias.length === 0) return [];
+    if (isBrowserOffline()) {
+      throw new Error('Sem internet. Reportes com fotos precisam de conexão para enviar as mídias.');
+    }
 
     const normalizedMedia = await Promise.all(
       midias.map(async (item) => {
@@ -326,8 +405,28 @@ export class ApiReporteRepository implements IReporteRepository {
     }
 
     await Promise.all(
-      uploads.map((upload, index) =>
-        FileSystem.uploadAsync(upload.uploadUrl, normalizedMedia[index].uri, {
+      uploads.map(async (upload, index) => {
+        if (isWeb) {
+          const sourceResponse = await fetch(normalizedMedia[index].uri);
+          const blob = await sourceResponse.blob();
+          const uploadResponse = await fetch(upload.uploadUrl, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': upload.mimeType,
+              ...(upload.headers || {}),
+            },
+            body: blob,
+          });
+
+          if (!uploadResponse.ok) {
+            throw new Error(
+              `Upload falhou para ${normalizedMedia[index].fileName} com status ${uploadResponse.status}`,
+            );
+          }
+          return;
+        }
+
+        return FileSystem.uploadAsync(upload.uploadUrl, normalizedMedia[index].uri, {
           httpMethod: 'PUT',
           uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
           headers: {
@@ -345,8 +444,8 @@ export class ApiReporteRepository implements IReporteRepository {
               `Upload falhou para ${normalizedMedia[index].fileName} com status ${result.status}: ${result.body || 'sem detalhes'}`,
             );
           }
-        }),
-      ),
+        });
+      }),
     );
 
     return uploads.map((upload, index) => ({
@@ -403,11 +502,14 @@ export class ApiReporteRepository implements IReporteRepository {
   async carregarMeuHistorico(): Promise<Reporte[]> {
     try {
       const response = await fetchWithAuth('/mobile/v1/reportes/history/me');
-      if (!response.ok) return [];
+      if (!response.ok) return getCachedHistory();
       const data = await response.json();
-      return data.map(mapPostToReporte);
+      const mapped = data.map(mapPostToReporte);
+      const merged = dedupeById([...(await getCachedHistory()), ...mapped]);
+      await cacheHistory(merged);
+      return merged;
     } catch {
-      return [];
+      return getCachedHistory();
     }
   }
 
@@ -450,5 +552,37 @@ export class ApiReporteRepository implements IReporteRepository {
           descricao: item.descricao || '',
         })),
     ];
+  }
+
+  async flushPendingSubmissions() {
+    if (isBrowserOffline()) {
+      return;
+    }
+
+    const pending = await getPendingSubmissions();
+
+    for (const item of pending.slice().reverse()) {
+      try {
+        const endpoint =
+          item.kind === 'reporte'
+            ? '/mobile/v1/reportes'
+            : item.kind === 'manhole'
+              ? '/mobile/v1/manholes'
+              : '/mobile/v1/flood-areas';
+
+        const response = await fetchWithAuth(endpoint, {
+          method: 'POST',
+          body: JSON.stringify(item.payload),
+        });
+
+        if (!response.ok) {
+          continue;
+        }
+
+        await removePendingSubmission(item.queueId);
+      } catch {
+        return;
+      }
+    }
   }
 }

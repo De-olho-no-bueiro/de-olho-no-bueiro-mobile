@@ -19,6 +19,7 @@ import { ThemedView } from '@/core/components/atoms/themed-view';
 import { Colors } from '@/core/constants/theme';
 import { useAuth } from '@/core/contexts/auth-context';
 import { useColorScheme } from '@/core/hooks/use-color-scheme';
+import { navigateBackOrFallback } from '@/core/utils/navigation';
 import { changeMyPassword, updateMyProfile } from '@/features/configuracoes/services/profile-api';
 
 export default function EditProfileScreen() {
@@ -204,7 +205,7 @@ export default function EditProfileScreen() {
       }
 
       Alert.alert('Sucesso', 'Perfil atualizado com sucesso.');
-      router.back();
+      navigateBackOrFallback(router, '/(tabs)/configuracoes');
     } catch (error: any) {
       Alert.alert('Erro', error?.message || 'Falha ao salvar dados.');
     } finally {
@@ -223,7 +224,7 @@ export default function EditProfileScreen() {
       >
         <View style={styles.header}>
           <TouchableOpacity
-            onPress={() => router.back()}
+            onPress={() => navigateBackOrFallback(router, '/(tabs)/configuracoes')}
             style={[styles.backButton, { backgroundColor: isDark ? '#1C2730' : '#E8F4F8' }]}
           >
             <IconSymbol name="chevron.left" size={22} color="#0A7EA4" />

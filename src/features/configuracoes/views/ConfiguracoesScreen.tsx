@@ -9,6 +9,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ThemedText } from '@/core/components/atoms/themed-text';
 import { ThemedView } from '@/core/components/atoms/themed-view';
 import { IconSymbol } from '@/core/components/atoms/icon-symbol';
+import { WebPushSettingsCard } from '@/core/components/organisms/web-push-settings-card';
 import { useColorScheme } from '@/core/hooks/use-color-scheme';
 import { Colors, Layout } from '@/core/constants/theme';
 import { useConfiguracoesViewModel } from '@/features/configuracoes/viewmodels/useConfiguracoesViewModel';
@@ -89,6 +90,8 @@ export function ConfiguracoesScreen() {
             </ThemedText>
           </TouchableOpacity>
         </View>
+
+        <WebPushSettingsCard />
 
         {/* Sobre */}
         <ThemedText style={[styles.sectionTitle, { color: colors.icon }]}>

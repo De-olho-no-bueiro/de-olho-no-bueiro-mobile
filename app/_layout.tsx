@@ -5,10 +5,15 @@ import 'react-native-reanimated';
 import '../global.css';
 import { useEffect } from 'react';
 
+import { NetworkStatusBanner } from '@/core/components/organisms/network-status-banner';
+import { PWAInstallCoach } from '@/core/components/organisms/pwa-install-coach';
+import { PWAShellRuntime } from '@/core/components/organisms/pwa-shell-runtime';
 import { ThemePreferenceProvider } from '@/core/contexts/theme-preference-context';
 import { useColorScheme } from '@/core/hooks/use-color-scheme';
 import { AuthProvider, useAuth } from '@/core/contexts/auth-context';
-import { View, ActivityIndicator } from 'react-native';
+import { View, ActivityIndicator, StyleSheet } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { isWeb } from '@/core/utils/platform-capabilities';
 
 export const unstable_settings = {
   anchor: '(tabs)',
@@ -38,7 +43,7 @@ function RootLayoutContent() {
   }, [user, isLoading, segments, router]);
 
   useEffect(() => {
-    if (!ENABLE_INCIDENT_MONITORING) {
+    if (!ENABLE_INCIDENT_MONITORING || isWeb) {
       return;
     }
 
@@ -73,7 +78,7 @@ function RootLayoutContent() {
   }, []);
 
   useEffect(() => {
-    if (!ENABLE_INCIDENT_MONITORING || isLoading) {
+    if (!ENABLE_INCIDENT_MONITORING || isLoading || isWeb) {
       return;
     }
 
@@ -117,11 +122,20 @@ function RootLayoutContent() {
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
-      </Stack>
+      <View style={styles.appShell}>
+        <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
+        </Stack>
+        <PWAShellRuntime />
+        <View pointerEvents="box-none" style={styles.topOverlay}>
+          <NetworkStatusBanner />
+        </View>
+        <View pointerEvents="box-none" style={styles.bottomOverlay}>
+          <PWAInstallCoach />
+        </View>
+      </View>
       <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
     </ThemeProvider>
   );
@@ -129,10 +143,30 @@ function RootLayoutContent() {
 
 export default function RootLayout() {
   return (
-    <AuthProvider>
-      <ThemePreferenceProvider>
-        <RootLayoutContent />
-      </ThemePreferenceProvider>
-    </AuthProvider>
+    <SafeAreaProvider>
+      <AuthProvider>
+        <ThemePreferenceProvider>
+          <RootLayoutContent />
+        </ThemePreferenceProvider>
+      </AuthProvider>
+    </SafeAreaProvider>
   );
 }
+
+const styles = StyleSheet.create({
+  appShell: {
+    flex: 1,
+  },
+  topOverlay: {
+    left: 0,
+    position: 'absolute',
+    right: 0,
+    top: 0,
+  },
+  bottomOverlay: {
+    bottom: 0,
+    left: 0,
+    position: 'absolute',
+    right: 0,
+  },
+});
