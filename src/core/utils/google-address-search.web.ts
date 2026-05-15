@@ -1,12 +1,14 @@
 import { loadGoogleMaps } from '@/core/utils/google-maps-loader.web';
 
 import type {
+  GoogleAddressCoordinate,
   GoogleAddressError,
   GoogleAddressPrediction,
   GoogleAddressSearchOptions,
   GoogleAddressResolved,
 } from '@/core/utils/google-address-search.shared';
 export type {
+  GoogleAddressCoordinate,
   GoogleAddressError,
   GoogleAddressPrediction,
   GoogleAddressResolved,
@@ -107,6 +109,177 @@ function logGoogleAddressDebug(event: string, payload: Record<string, unknown>) 
     host,
     ...payload,
   });
+}
+
+function normalizeAddressLabel(label: string | null | undefined) {
+  return label?.replace(/\s+/g, ' ').trim() || '';
+}
+
+function getAddressComponent(result: any, targetTypes: string[]) {
+  const components = Array.isArray(result?.address_components)
+    ? result.address_components
+    : [];
+
+  const component = components.find((entry: any) =>
+    Array.isArray(entry?.types) &&
+    targetTypes.some((type) => entry.types.includes(type)),
+  );
+
+  return normalizeAddressLabel(component?.long_name || component?.short_name);
+}
+
+function buildApproximateAddressFromComponents(result: any) {
+  const street = getAddressComponent(result, ['route']);
+  const streetNumber = getAddressComponent(result, ['street_number']);
+  const neighborhood = getAddressComponent(result, [
+    'sublocality',
+    'sublocality_level_1',
+    'neighborhood',
+  ]);
+  const locality = getAddressComponent(result, ['locality']);
+  const adminAreaLevel2 = getAddressComponent(result, [
+    'administrative_area_level_2',
+  ]);
+  const adminAreaLevel1 = getAddressComponent(result, [
+    'administrative_area_level_1',
+  ]);
+
+  const headline = street
+    ? [street, streetNumber].filter(Boolean).join(', ')
+    : neighborhood || locality || adminAreaLevel2 || adminAreaLevel1;
+
+  const tail = [
+    street ? neighborhood : null,
+    locality,
+    !locality ? adminAreaLevel2 : null,
+    adminAreaLevel1,
+  ].filter(Boolean);
+
+  const approximateAddress = [headline, ...tail].filter(Boolean).join(', ');
+  return normalizeAddressLabel(approximateAddress);
+}
+
+function isCountryOnlyResult(result: any) {
+  const types = Array.isArray(result?.types) ? result.types : [];
+  return types.length > 0 && types.every((type: string) => type === 'country');
+}
+
+function isPlusCodeOnlyResult(result: any) {
+  const types = Array.isArray(result?.types) ? result.types : [];
+  if (!types.includes('plus_code')) {
+    return false;
+  }
+
+  return !buildApproximateAddressFromComponents(result);
+}
+
+function isUsefulAddressLabel(label: string) {
+  const normalized = normalizeAddressLabel(label);
+  if (!normalized) {
+    return false;
+  }
+
+  if (/^brasil$/i.test(normalized)) {
+    return false;
+  }
+
+  return true;
+}
+
+function getReverseGeocodePriority(result: any) {
+  const types = Array.isArray(result?.types) ? result.types : [];
+
+  if (types.includes('street_address')) return 0;
+  if (types.includes('premise') || types.includes('subpremise')) return 1;
+  if (types.includes('route')) return 2;
+  if (types.includes('intersection')) return 3;
+  if (
+    types.includes('neighborhood') ||
+    types.includes('sublocality') ||
+    types.includes('sublocality_level_1')
+  ) {
+    return 4;
+  }
+  if (types.includes('locality') || types.includes('postal_code')) return 5;
+  if (
+    types.includes('administrative_area_level_2') ||
+    types.includes('administrative_area_level_1')
+  ) {
+    return 6;
+  }
+  if (types.includes('country') || types.includes('plus_code')) return 99;
+
+  return 7;
+}
+
+function buildReverseGeocodeCandidate(result: any) {
+  if (!result?.geometry?.location) {
+    return null;
+  }
+
+  const label = normalizeAddressLabel(result.formatted_address || result.name);
+  const approximateLabel = buildApproximateAddressFromComponents(result);
+  const types = Array.isArray(result?.types) ? result.types : [];
+
+  return {
+    result,
+    label,
+    approximateLabel,
+    priority: getReverseGeocodePriority(result),
+    types,
+    isCountryOnly: isCountryOnlyResult(result),
+    isPlusCodeOnly: isPlusCodeOnlyResult(result),
+  };
+}
+
+type ReverseGeocodeCandidate = NonNullable<
+  ReturnType<typeof buildReverseGeocodeCandidate>
+>;
+
+function pickCandidateLabel(candidate: ReturnType<typeof buildReverseGeocodeCandidate>) {
+  if (!candidate) {
+    return '';
+  }
+
+  if (candidate.isCountryOnly) {
+    return '';
+  }
+
+  if (candidate.isPlusCodeOnly) {
+    return candidate.approximateLabel;
+  }
+
+  if (isUsefulAddressLabel(candidate.label)) {
+    return candidate.label;
+  }
+
+  if (isUsefulAddressLabel(candidate.approximateLabel)) {
+    return candidate.approximateLabel;
+  }
+
+  return '';
+}
+
+function selectBestReverseGeocodeResult(results: any[] | null | undefined) {
+  if (!Array.isArray(results) || results.length === 0) {
+    return null;
+  }
+
+  const candidates = results
+    .map((result) => buildReverseGeocodeCandidate(result))
+    .filter((candidate): candidate is ReverseGeocodeCandidate => Boolean(candidate))
+    .map((candidate) => ({
+      ...candidate,
+      resolvedLabel: pickCandidateLabel(candidate),
+    }))
+    .filter((candidate) => isUsefulAddressLabel(candidate.resolvedLabel));
+
+  if (candidates.length === 0) {
+    return null;
+  }
+
+  candidates.sort((left, right) => left.priority - right.priority);
+  return candidates[0];
 }
 
 async function getPredictions(
@@ -271,5 +444,61 @@ export async function geocodeAddressWithGoogleMaps(
         })),
       );
     });
+  });
+}
+
+export async function reverseGeocodeCoordinateWithGoogleMaps(
+  coordinate: GoogleAddressCoordinate,
+  options?: GoogleAddressSearchOptions,
+): Promise<GoogleAddressResolved | null> {
+  const maps = await loadGoogleMaps();
+  const geocoder = getGeocoder(maps);
+
+  return new Promise((resolve, reject) => {
+    geocoder.geocode(
+      {
+        location: {
+          lat: coordinate.latitude,
+          lng: coordinate.longitude,
+        },
+        language: options?.language || 'pt-BR',
+        region: options?.region || 'br',
+      },
+      (results: any[] | null, status: string) => {
+        logGoogleAddressDebug('reverse-geocode-response', {
+          coordinate,
+          status,
+          count: results?.length || 0,
+        });
+
+        const error = mapStatusToError(
+          'Google Geocoder falhou ao resolver coordenadas',
+          status,
+          'geocode',
+        );
+        if (error) {
+          reject(error);
+          return;
+        }
+
+        const bestCandidate = selectBestReverseGeocodeResult(results);
+        if (!bestCandidate) {
+          resolve(null);
+          return;
+        }
+
+        const location = bestCandidate.result.geometry.location;
+        resolve({
+          id: `reverse-${coordinate.latitude.toFixed(6)}-${coordinate.longitude.toFixed(6)}`,
+          label: bestCandidate.resolvedLabel,
+          coordinate: {
+            latitude: location.lat(),
+            longitude: location.lng(),
+          },
+          placeId: bestCandidate.result.place_id || undefined,
+          types: bestCandidate.types,
+        });
+      },
+    );
   });
 }

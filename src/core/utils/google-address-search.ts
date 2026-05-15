@@ -1,4 +1,5 @@
 import type {
+  GoogleAddressCoordinate,
   GoogleAddressPrediction,
   GoogleAddressResolved,
   GoogleAddressSearchOptions,
@@ -6,6 +7,7 @@ import type {
 
 export type {
   GoogleAddressError,
+  GoogleAddressCoordinate,
   GoogleAddressPrediction,
   GoogleAddressResolved,
   GoogleAddressSearchOptions,
@@ -37,5 +39,12 @@ export async function geocodeAddressWithGoogleMaps(
   _maxResults = 5,
   _options?: GoogleAddressSearchOptions,
 ): Promise<GoogleAddressResolved[]> {
+  throw unsupportedError();
+}
+
+export async function reverseGeocodeCoordinateWithGoogleMaps(
+  _coordinate: GoogleAddressCoordinate,
+  _options?: GoogleAddressSearchOptions,
+): Promise<GoogleAddressResolved | null> {
   throw unsupportedError();
 }

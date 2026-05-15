@@ -4,6 +4,11 @@ export type GoogleAddressPrediction = {
   placeId: string;
 };
 
+export type GoogleAddressCoordinate = {
+  latitude: number;
+  longitude: number;
+};
+
 export type GoogleAddressSearchOptions = {
   country?: string;
   language?: string;
@@ -18,11 +23,9 @@ export type GoogleAddressSearchOptions = {
 export type GoogleAddressResolved = {
   id: string;
   label: string;
-  coordinate: {
-    latitude: number;
-    longitude: number;
-  };
+  coordinate: GoogleAddressCoordinate;
   placeId?: string;
+  types?: string[];
 };
 
 export type GoogleAddressError = Error & {

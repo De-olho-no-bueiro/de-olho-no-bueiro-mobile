@@ -13,6 +13,7 @@ import {
   geocodeAddressWithGoogleMaps,
   geocodePlaceIdWithGoogleMaps,
   isGoogleRequestDeniedError,
+  reverseGeocodeCoordinateWithGoogleMaps,
   searchAddressPredictionsWithGoogleMaps,
 } from '@/core/utils/google-address-search';
 import { isWeb } from '@/core/utils/platform-capabilities';
@@ -68,6 +69,15 @@ function formatarEndereco(addr: Location.LocationGeocodedAddress | null): string
 
 function formatarCoordenadas({ latitude, longitude }: Coordenadas): string {
   return `Coordenadas: ${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
+}
+
+function isEnderecoValido(enderecoResolvido: string | null | undefined) {
+  if (!enderecoResolvido) {
+    return false;
+  }
+
+  const normalized = enderecoResolvido.trim();
+  return normalized.length > 0 && normalized !== 'Endereço não disponível';
 }
 
 function buildSuggestionMapKey(suggestion: SearchSuggestionItem): string {
@@ -339,18 +349,55 @@ export function useMapViewModel() {
   const isMapBootstrapping =
     !hasResolvedInitialLocation || loadingInitialData || !isInitialViewportReady;
 
+  const resolverEnderecoDoPonto = useCallback(async (coordinate: Coordenadas) => {
+    const fallbackAddress = formatarCoordenadas(coordinate);
+
+    if (isWeb) {
+      try {
+        const googleAddress = await reverseGeocodeCoordinateWithGoogleMaps(
+          coordinate,
+          getGoogleSearchOptions(userLocation),
+        );
+        if (isEnderecoValido(googleAddress?.label)) {
+          return googleAddress!.label.trim();
+        }
+      } catch (error) {
+        logSearchFallback('reverse-geocode-google-failed', {
+          coordinate,
+          message: error instanceof Error ? error.message : 'unknown-error',
+        });
+      }
+    }
+
+    try {
+      const results = await Location.reverseGeocodeAsync(coordinate);
+      const nativeAddress = formatarEndereco(results[0] ?? null);
+      if (isEnderecoValido(nativeAddress)) {
+        return nativeAddress;
+      }
+    } catch (error) {
+      logSearchFallback('reverse-geocode-device-failed', {
+        coordinate,
+        message: error instanceof Error ? error.message : 'unknown-error',
+      });
+    }
+
+    return fallbackAddress;
+  }, [userLocation]);
+
   const buscarEnderecoParaConfirmacao = useCallback(async (lat: number, lon: number) => {
     setLoadingConfirmationAddress(true);
     setConfirmationAddress('');
     try {
-      const results = await Location.reverseGeocodeAsync({ latitude: lat, longitude: lon });
-      setConfirmationAddress(formatarEndereco(results[0] ?? null) || 'Endereço não disponível');
-    } catch {
-      setConfirmationAddress('Endereço não disponível');
+      const nextAddress = await resolverEnderecoDoPonto({
+        latitude: lat,
+        longitude: lon,
+      });
+      setConfirmationAddress(nextAddress);
     } finally {
       setLoadingConfirmationAddress(false);
     }
-  }, []);
+  }, [resolverEnderecoDoPonto]);
 
   const centralizarNoMapa = useCallback((coordinate: Coordenadas) => {
     const newRegion: Region = {
@@ -827,12 +874,7 @@ export function useMapViewModel() {
     setLoadingAddress(true);
     setLoadingConfirmationAddress(true);
 
-    let nextAddress = formatarCoordenadas(userLocation);
-
-    try {
-      const results = await Location.reverseGeocodeAsync(userLocation);
-      nextAddress = formatarEndereco(results[0] ?? null) || nextAddress;
-    } catch {}
+    const nextAddress = await resolverEnderecoDoPonto(userLocation);
 
     setConfirmationAddress(nextAddress);
     resetFormState({ preserveAddress: true });
@@ -840,7 +882,7 @@ export function useMapViewModel() {
     setLoadingAddress(false);
     setLoadingConfirmationAddress(false);
     setModalVisible(true);
-  }, [resetFormState, userLocation]);
+  }, [resetFormState, resolverEnderecoDoPonto, userLocation]);
 
   const recentralizar = useCallback(() => {
     if (!userLocation) {
@@ -965,16 +1007,10 @@ export function useMapViewModel() {
     const referencia = { latitude, longitude };
     
     setLoadingConfirmationAddress(true);
-    Location.reverseGeocodeAsync(referencia)
-      .then((results) => {
-        const addr = formatarEndereco(results[0] ?? null) || formatarCoordenadas(referencia);
+    void resolverEnderecoDoPonto(referencia)
+      .then((addr) => {
         setConfirmationAddress(addr);
         setEndereco(addr);
-      })
-      .catch(() => {
-        const fallback = formatarCoordenadas(referencia);
-        setConfirmationAddress(fallback);
-        setEndereco(fallback);
       })
       .finally(() => {
         setLoadingConfirmationAddress(false);
@@ -983,7 +1019,7 @@ export function useMapViewModel() {
         resetFormState({ preserveAddress: true });
         setModalVisible(true);
       });
-  }, [drawingCoordinates, resetFormState]);
+  }, [drawingCoordinates, resetFormState, resolverEnderecoDoPonto]);
 
   const salvar = useCallback(async () => {
     setSalvando(true);
@@ -1148,6 +1184,8 @@ export function useMapViewModel() {
     cancelarPin,
     toggleDrawingMode,
     desfazerUltimoPonto,
+    escolherDaGaleria,
+    tirarFoto,
     escolherFoto,
     removerFoto,
     salvar,

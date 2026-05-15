@@ -754,26 +754,77 @@ export function MapScreen() {
               />
 
               <ThemedText style={styles.label}>Mídia (opcional)</ThemedText>
-              <TouchableOpacity
-                style={[
-                  styles.fotoButton,
-                  {
-                    borderColor: colors.border,
-                    backgroundColor: colors.surface,
-                    marginBottom: vm.midiasUri.length > 0 ? 12 : 24,
-                    opacity: vm.midiasUri.length >= 6 ? 0.5 : 1,
-                  },
-                ]}
-                onPress={vm.escolherFoto}
-                disabled={vm.midiasUri.length >= 6}
-              >
-                <IconSymbol name="camera.fill" size={32} color={colors.icon} />
-                <ThemedText style={styles.fotoLabel}>
-                  {vm.midiasUri.length >= 6
-                    ? "Limite de 6 fotos atingido"
-                    : "Anexar foto"}
-                </ThemedText>
-              </TouchableOpacity>
+              {Platform.OS === "web" ? (
+                <View
+                  style={[
+                    styles.webPhotoActions,
+                    {
+                      marginBottom: vm.midiasUri.length > 0 ? 12 : 24,
+                    },
+                  ]}
+                >
+                  <TouchableOpacity
+                    style={[
+                      styles.webPhotoButton,
+                      {
+                        borderColor: colors.border,
+                        backgroundColor: colors.surface,
+                        opacity: vm.midiasUri.length >= 6 ? 0.5 : 1,
+                      },
+                    ]}
+                    onPress={vm.tirarFoto}
+                    disabled={vm.midiasUri.length >= 6}
+                  >
+                    <IconSymbol name="camera.fill" size={24} color={colors.icon} />
+                    <ThemedText style={styles.webPhotoButtonLabel}>
+                      {vm.midiasUri.length >= 6 ? "Limite atingido" : "Tirar foto"}
+                    </ThemedText>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[
+                      styles.webPhotoButton,
+                      {
+                        borderColor: colors.border,
+                        backgroundColor: colors.surface,
+                        opacity: vm.midiasUri.length >= 6 ? 0.5 : 1,
+                      },
+                    ]}
+                    onPress={vm.escolherDaGaleria}
+                    disabled={vm.midiasUri.length >= 6}
+                  >
+                    <MaterialIcons
+                      name="photo-library"
+                      size={24}
+                      color={colors.icon}
+                    />
+                    <ThemedText style={styles.webPhotoButtonLabel}>
+                      {vm.midiasUri.length >= 6 ? "Limite atingido" : "Escolher da galeria"}
+                    </ThemedText>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <TouchableOpacity
+                  style={[
+                    styles.fotoButton,
+                    {
+                      borderColor: colors.border,
+                      backgroundColor: colors.surface,
+                      marginBottom: vm.midiasUri.length > 0 ? 12 : 24,
+                      opacity: vm.midiasUri.length >= 6 ? 0.5 : 1,
+                    },
+                  ]}
+                  onPress={vm.escolherFoto}
+                  disabled={vm.midiasUri.length >= 6}
+                >
+                  <IconSymbol name="camera.fill" size={32} color={colors.icon} />
+                  <ThemedText style={styles.fotoLabel}>
+                    {vm.midiasUri.length >= 6
+                      ? "Limite de 6 fotos atingido"
+                      : "Anexar foto"}
+                  </ThemedText>
+                </TouchableOpacity>
+              )}
 
               {vm.midiasUri.length > 0 && (
                 <ScrollView
@@ -1076,6 +1127,26 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 24,
+  },
+  webPhotoActions: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  webPhotoButton: {
+    flex: 1,
+    minHeight: 96,
+    borderWidth: 2,
+    borderStyle: "dashed",
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 16,
+    gap: 8,
+  },
+  webPhotoButtonLabel: {
+    fontSize: 14,
+    textAlign: "center",
   },
   fotoPreview: {
     width: "100%",
