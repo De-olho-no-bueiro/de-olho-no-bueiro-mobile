@@ -369,13 +369,6 @@ export function ReportDetailsScreen() {
                   </ThemedText>
                 </Pressable>
 
-                <Pressable style={styles.actionButton} onPress={handleShare}>
-                  <IconSymbol name="square.and.arrow.up" size={24} color={textPrimary} />
-                  <ThemedText style={[styles.actionLabel, { color: textPrimary }]}>
-                    Compartilhar
-                  </ThemedText>
-                </Pressable>
-
                 {showVerificationPrompt ? (
                   <Pressable style={styles.actionButton} onPress={handleVerify}>
                     <MaterialCommunityIcons name="shield-alert" size={22} color={textPrimary} />
@@ -384,6 +377,13 @@ export function ReportDetailsScreen() {
                     </ThemedText>
                   </Pressable>
                 ) : null}
+
+                <Pressable
+                  style={[styles.actionButton, { marginLeft: 'auto' }]}
+                  onPress={handleShare}
+                >
+                  <IconSymbol name="square.and.arrow.up" size={24} color={textPrimary} />
+                </Pressable>
               </View>
 
               <View style={styles.bodySection}>

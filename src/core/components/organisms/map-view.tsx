@@ -1,6 +1,6 @@
 import React from 'react';
 import Constants from 'expo-constants';
-import { View, StyleSheet, Text, Platform, Pressable } from 'react-native';
+import { View, StyleSheet, Text, Platform, TouchableOpacity } from 'react-native';
 import MapView, { Marker, Polygon, Callout, Circle } from 'react-native-maps';
 import { Ionicons } from '@expo/vector-icons';
 import type { TipoReporte, NivelAlagamento, Manhole, FloodArea } from '@/features/reportes/models/Reporte';
@@ -35,6 +35,7 @@ interface MapViewComponentProps {
   selectedPoint: { latitude: number; longitude: number } | null;
   colors: any;
   tintColor?: string;
+  androidBottomOverlayInset?: number;
 }
 
 type CalloutPayload = {
@@ -48,11 +49,14 @@ type CalloutPayload = {
   iconColor: string;
 };
 
+type CalloutCardPayload = Omit<CalloutPayload, 'coordinate'>;
+
 const ANDROID_CALLOUT_WIDTH = 260;
 const ANDROID_CALLOUT_HORIZONTAL_MARGIN = 12;
 const ANDROID_CALLOUT_VERTICAL_OFFSET = 170;
 const ANDROID_CALLOUT_TOP_MARGIN = 16;
-const ANDROID_CALLOUT_ESTIMATED_HEIGHT = 150;
+const ANDROID_CALLOUT_BOTTOM_MARGIN = 20;
+const ANDROID_CALLOUT_ESTIMATED_HEIGHT = 182;
 const expoConfigExtra = (Constants.expoConfig?.extra ?? {}) as {
   googleMapsConfigured?: boolean;
 };
@@ -87,6 +91,7 @@ export default function MapViewComponent({
   selectedPoint,
   colors,
   tintColor,
+  androidBottomOverlayInset = 0,
 }: MapViewComponentProps) {
   const reportMarkerRefs = React.useRef<Record<string, MarkerRef | null>>({});
   const manholeMarkerRefs = React.useRef<Record<string, MarkerRef | null>>({});
@@ -94,6 +99,7 @@ export default function MapViewComponent({
   const [selectedFloodAreaId, setSelectedFloodAreaId] = React.useState<string | null>(null);
   const [androidCallout, setAndroidCallout] = React.useState<CalloutPayload | null>(null);
   const [androidCalloutPoint, setAndroidCalloutPoint] = React.useState<{ x: number; y: number } | null>(null);
+  const [androidCalloutHeight, setAndroidCalloutHeight] = React.useState(ANDROID_CALLOUT_ESTIMATED_HEIGHT);
   const [mapLayout, setMapLayout] = React.useState({ width: 0, height: 0 });
   const isAndroid = Platform.OS === 'android';
 
@@ -131,10 +137,18 @@ export default function MapViewComponent({
     [isAndroid, updateAndroidCalloutPosition],
   );
 
-  const renderCalloutContent = React.useCallback(
-    (payload: Omit<CalloutPayload, 'coordinate'>) => (
-      <View style={styles.calloutWrapper}>
-        <View style={styles.calloutBubble}>
+  const renderCalloutCard = React.useCallback(
+    ({
+      payload,
+      interactive = false,
+      onActionPress,
+    }: {
+      payload: CalloutCardPayload;
+      interactive?: boolean;
+      onActionPress?: () => void;
+    }) => (
+      <View style={styles.calloutBubble}>
+        <View style={styles.calloutBody}>
           <View style={styles.calloutHeader}>
             <View
               style={[
@@ -153,14 +167,35 @@ export default function MapViewComponent({
           <Text style={styles.calloutDesc} numberOfLines={2}>
             {payload.description}
           </Text>
-          <View style={styles.calloutButton}>
-            <Text style={styles.calloutButtonText}>Veja mais</Text>
-          </View>
         </View>
-        <View style={styles.calloutArrow} />
+        <View style={styles.calloutActionContainer}>
+          {interactive ? (
+            <TouchableOpacity
+              onPress={onActionPress}
+              activeOpacity={0.9}
+              style={styles.calloutButton}
+            >
+              <Text style={styles.calloutButtonText}>Veja mais</Text>
+            </TouchableOpacity>
+          ) : (
+            <View style={styles.calloutButton}>
+              <Text style={styles.calloutButtonText}>Veja mais</Text>
+            </View>
+          )}
+        </View>
       </View>
     ),
     [],
+  );
+
+  const renderCalloutContent = React.useCallback(
+    (payload: CalloutCardPayload) => (
+      <View style={styles.calloutWrapper}>
+        {renderCalloutCard({ payload })}
+        <View style={styles.calloutArrow} />
+      </View>
+    ),
+    [renderCalloutCard],
   );
 
   const renderNativeCallout = React.useCallback(
@@ -182,6 +217,11 @@ export default function MapViewComponent({
   const androidCalloutStyle = React.useMemo(() => {
     if (!androidCalloutPoint || mapLayout.width <= 0) return null;
 
+    const reservedBottomSpace = Math.max(
+      ANDROID_CALLOUT_BOTTOM_MARGIN,
+      androidBottomOverlayInset + ANDROID_CALLOUT_BOTTOM_MARGIN,
+    );
+
     const left = Math.min(
       Math.max(
         androidCalloutPoint.x - ANDROID_CALLOUT_WIDTH / 2,
@@ -200,7 +240,7 @@ export default function MapViewComponent({
       ),
       Math.max(
         ANDROID_CALLOUT_TOP_MARGIN,
-        mapLayout.height - ANDROID_CALLOUT_ESTIMATED_HEIGHT,
+        mapLayout.height - androidCalloutHeight - reservedBottomSpace,
       ),
     );
 
@@ -210,7 +250,13 @@ export default function MapViewComponent({
     );
 
     return { left, top, arrowLeft };
-  }, [androidCalloutPoint, mapLayout.height, mapLayout.width]);
+  }, [
+    androidBottomOverlayInset,
+    androidCalloutHeight,
+    androidCalloutPoint,
+    mapLayout.height,
+    mapLayout.width,
+  ]);
 
   if (isAndroid && !HAS_GOOGLE_MAPS_KEY) {
     return (
@@ -471,6 +517,12 @@ export default function MapViewComponent({
       {isAndroid && androidCallout && androidCalloutStyle ? (
         <View
           pointerEvents="box-none"
+          onLayout={({ nativeEvent }) => {
+            const nextHeight = Math.ceil(nativeEvent.layout.height);
+            if (nextHeight > 0 && nextHeight !== androidCalloutHeight) {
+              setAndroidCalloutHeight(nextHeight);
+            }
+          }}
           style={[
             styles.androidCalloutContainer,
             {
@@ -479,40 +531,22 @@ export default function MapViewComponent({
             },
           ]}
         >
-          <View style={styles.calloutBubble}>
-            <View style={styles.calloutHeader}>
-              <View
-                style={[
-                  styles.calloutIconWrapper,
-                  {
-                    backgroundColor: androidCallout.iconBackgroundColor,
-                  },
-                ]}
-              >
-                <Ionicons
-                  name={androidCallout.iconName}
-                  size={18}
-                  color={androidCallout.iconColor}
-                />
-              </View>
-              <Text style={styles.calloutTitle}>{androidCallout.title}</Text>
-            </View>
-            <Text style={styles.calloutDesc} numberOfLines={2}>
-              {androidCallout.description}
-            </Text>
-            <Pressable
-              onPress={() => {
-                closeAndroidCallout();
-                onCalloutPress?.(androidCallout.id, androidCallout.tipo);
-              }}
-              style={({ pressed }) => [
-                styles.calloutButton,
-                pressed && styles.calloutButtonPressed,
-              ]}
-            >
-              <Text style={styles.calloutButtonText}>Veja mais</Text>
-            </Pressable>
-          </View>
+          {renderCalloutCard({
+            payload: {
+              id: androidCallout.id,
+              tipo: androidCallout.tipo,
+              title: androidCallout.title,
+              description: androidCallout.description,
+              iconName: androidCallout.iconName,
+              iconBackgroundColor: androidCallout.iconBackgroundColor,
+              iconColor: androidCallout.iconColor,
+            },
+            interactive: true,
+            onActionPress: () => {
+              closeAndroidCallout();
+              onCalloutPress?.(androidCallout.id, androidCallout.tipo);
+            },
+          })}
           <View
             style={[
               styles.calloutArrow,
@@ -616,13 +650,18 @@ const styles = StyleSheet.create({
   calloutBubble: {
     backgroundColor: '#fff',
     borderRadius: 16,
-    padding: 16,
     width: '100%',
+    overflow: 'hidden',
     shadowColor: '#000',
     shadowOpacity: 0.15,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 4 },
     elevation: 6,
+  },
+  calloutBody: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 14,
   },
   calloutHeader: {
     flexDirection: 'row',
@@ -646,23 +685,30 @@ const styles = StyleSheet.create({
   calloutDesc: {
     fontSize: 14,
     color: '#666',
-    marginBottom: 16,
     lineHeight: 20,
   },
+  calloutActionContainer: {
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+    paddingTop: 2,
+    backgroundColor: '#FFFFFF',
+  },
   calloutButton: {
-    backgroundColor: '#007AFF', // Waze-like Blue
-    borderRadius: 24,
-    paddingVertical: 10,
+    backgroundColor: '#0A74FF',
+    borderRadius: 14,
+    height: 46,
+    borderWidth: 1,
+    borderColor: '#0058C7',
     alignItems: 'center',
     justifyContent: 'center',
+    width: '100%',
+    paddingHorizontal: 16,
+    overflow: 'hidden',
   },
   calloutButtonText: {
     color: '#fff',
-    fontWeight: '700',
+    fontWeight: '800',
     fontSize: 15,
-  },
-  calloutButtonPressed: {
-    opacity: 0.85,
   },
   calloutArrow: {
     backgroundColor: 'transparent',
