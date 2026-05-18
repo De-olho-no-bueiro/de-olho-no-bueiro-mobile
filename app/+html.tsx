@@ -20,7 +20,7 @@ export default function Root({ children }: PropsWithChildren) {
         <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
         <meta
           name="viewport"
-          content="width=device-width, initial-scale=1, viewport-fit=cover, shrink-to-fit=no"
+          content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0, viewport-fit=cover, shrink-to-fit=no"
         />
         <meta name="theme-color" content="#0C5A87" />
         <meta name="mobile-web-app-capable" content="yes" />
@@ -41,7 +41,7 @@ export default function Root({ children }: PropsWithChildren) {
         <style
           dangerouslySetInnerHTML={{
             __html:
-              'html,body{background:#dbe9ff;margin:0;padding:0;}body{min-height:100vh;min-height:100dvh;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;}',
+              'html,body{background:#dbe9ff;margin:0;padding:0;touch-action:pan-x pan-y;}body{min-height:100vh;min-height:100dvh;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;}',
           }}
         />
         <script dangerouslySetInnerHTML={{ __html: pwaBootstrapScript }} />

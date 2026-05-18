@@ -90,18 +90,7 @@ function isSameCoordinate(a: Coordinate, b: Coordinate) {
   );
 }
 
-function getEventClientPoint(event: PointerEvent | TouchEvent) {
-  if ('clientX' in event && typeof event.clientX === 'number') {
-    return { x: event.clientX, y: event.clientY };
-  }
 
-  const touch = event.changedTouches?.[0] || event.touches?.[0];
-  if (!touch) {
-    return null;
-  }
-
-  return { x: touch.clientX, y: touch.clientY };
-}
 
 export default function MapViewComponent({
   mapRef,
@@ -122,7 +111,6 @@ export default function MapViewComponent({
   const overlaysRef = React.useRef<any[]>([]);
   const mapClickListenerRef = React.useRef<any>(null);
   const infoWindowRef = React.useRef<any>(null);
-  const projectionOverlayRef = React.useRef<any>(null);
   const lastEmitRef = React.useRef<{ coordinate: Coordinate; at: number } | null>(null);
   const [status, setStatus] = React.useState<'loading' | 'ready' | 'error' | 'missing-key'>(
     getGoogleMapsApiKey() ? 'loading' : 'missing-key',
@@ -221,15 +209,7 @@ export default function MapViewComponent({
           gestureHandling: 'greedy',
         });
 
-        class ProjectionOverlay extends maps.OverlayView {
-          onAdd() {}
-          draw() {}
-          onRemove() {}
-        }
 
-        const projectionOverlay = new ProjectionOverlay();
-        projectionOverlay.setMap(map);
-        projectionOverlayRef.current = projectionOverlay;
 
         googleMapRef.current = map;
         mapRef.current = {
@@ -252,7 +232,6 @@ export default function MapViewComponent({
     return () => {
       mounted = false;
       mapClickListenerRef.current?.remove?.();
-      projectionOverlayRef.current?.setMap?.(null);
     };
   }, [mapRef, region]);
 
@@ -292,58 +271,6 @@ export default function MapViewComponent({
     };
   }, [closeInfoWindow, emitCoordinate, isMapReady]);
 
-  React.useEffect(() => {
-    if (!isMapReady || !googleMapRef.current || !projectionOverlayRef.current || !isDrawing) {
-      return;
-    }
-
-    const mapDiv = googleMapRef.current.getDiv?.() as HTMLDivElement | undefined;
-    if (!mapDiv) {
-      return;
-    }
-
-    const projectEventToCoordinate = (event: PointerEvent | TouchEvent, source: DebugState['source']) => {
-      const projection = projectionOverlayRef.current?.getProjection?.();
-      const point = getEventClientPoint(event);
-      if (!projection || !point) {
-        setDebugState({ source: 'projection-miss', at: Date.now() });
-        return;
-      }
-
-      const bounds = mapDiv.getBoundingClientRect();
-      const pixelPoint = new window.google.maps.Point(point.x - bounds.left, point.y - bounds.top);
-      const latLng = projection.fromDivPixelToLatLng(pixelPoint);
-      if (!latLng) {
-        setDebugState({ source: 'projection-miss', at: Date.now() });
-        return;
-      }
-
-      closeInfoWindow();
-      emitCoordinate(
-        {
-          latitude: latLng.lat(),
-          longitude: latLng.lng(),
-        },
-        source,
-      );
-    };
-
-    const handlePointerUp = (event: PointerEvent) => {
-      projectEventToCoordinate(event, 'pointerup');
-    };
-
-    const handleTouchEnd = (event: TouchEvent) => {
-      projectEventToCoordinate(event, 'touchend');
-    };
-
-    mapDiv.addEventListener('pointerup', handlePointerUp, { passive: true });
-    mapDiv.addEventListener('touchend', handleTouchEnd, { passive: true });
-
-    return () => {
-      mapDiv.removeEventListener('pointerup', handlePointerUp);
-      mapDiv.removeEventListener('touchend', handleTouchEnd);
-    };
-  }, [closeInfoWindow, emitCoordinate, isDrawing, isMapReady]);
 
   React.useEffect(() => {
     if (!isMapReady || !googleMapRef.current || !window.google?.maps) {
@@ -514,11 +441,13 @@ export default function MapViewComponent({
       overlaysRef.current.push(marker);
     });
 
+    const orderedDrawing = ordenarPontosPoligono(drawingCoordinates);
+
     if (drawingCoordinates.length >= 2) {
       const polyline = new maps.Polyline({
         map,
         clickable: false,
-        path: drawingCoordinates.map((coordinate) => ({
+        path: orderedDrawing.map((coordinate) => ({
           lat: coordinate.latitude,
           lng: coordinate.longitude,
         })),
@@ -534,7 +463,7 @@ export default function MapViewComponent({
       const polygon = new maps.Polygon({
         map,
         clickable: false,
-        paths: drawingCoordinates.map((coordinate) => ({
+        paths: orderedDrawing.map((coordinate) => ({
           lat: coordinate.latitude,
           lng: coordinate.longitude,
         })),
