@@ -710,7 +710,11 @@ export function useMapViewModel() {
   }, [centralizarNoMapa, limparBuscaPendente]);
 
   const getFilteredReportes = useCallback(() => {
-    let filtered = savedReportes;
+    let filtered = savedReportes.filter((r) => {
+      if (r.isActive === false) return false;
+      const days = (Date.now() - new Date(r.dataHora).getTime()) / (1000 * 60 * 60 * 24);
+      return days <= 3;
+    });
 
     if (filtroAtivo === 'mais-graves') {
       filtered = filtered.filter(r => r.nivel === 'avancado' || r.nivel === 'extremo');
@@ -728,27 +732,39 @@ export function useMapViewModel() {
   }, [savedReportes, filtroAtivo]);
 
   const getFilteredManholes = useCallback(() => {
+    let filtered = savedManholes.filter((m) => {
+      if (m.isActive === false) return false;
+      const days = (Date.now() - new Date(m.dataHora).getTime()) / (1000 * 60 * 60 * 24);
+      return days <= 3;
+    });
+
     if (filtroAtivo === 'alagamentos') return [];
     if (filtroAtivo === 'mais-graves') return [];
     if (filtroAtivo === 'ultimos-7-dias') {
       const seteDiasAtras = new Date();
       seteDiasAtras.setDate(seteDiasAtras.getDate() - 7);
-      return savedManholes.filter(m => new Date(m.dataHora) >= seteDiasAtras);
+      return filtered.filter(m => new Date(m.dataHora) >= seteDiasAtras);
     }
-    return savedManholes;
+    return filtered;
   }, [savedManholes, filtroAtivo]);
 
   const getFilteredFloodAreas = useCallback(() => {
+    let filtered = savedFloodAreas.filter((fa) => {
+      if (fa.isActive === false) return false;
+      const days = (Date.now() - new Date(fa.dataHora).getTime()) / (1000 * 60 * 60 * 24);
+      return days <= 3;
+    });
+
     if (filtroAtivo === 'bueiros') return [];
     if (filtroAtivo === 'mais-graves') {
-      return savedFloodAreas.filter(fa => fa.nivel === 'avancado' || fa.nivel === 'extremo');
+      return filtered.filter(fa => fa.nivel === 'avancado' || fa.nivel === 'extremo');
     }
     if (filtroAtivo === 'ultimos-7-dias') {
       const seteDiasAtras = new Date();
       seteDiasAtras.setDate(seteDiasAtras.getDate() - 7);
-      return savedFloodAreas.filter(fa => new Date(fa.dataHora) >= seteDiasAtras);
+      return filtered.filter(fa => new Date(fa.dataHora) >= seteDiasAtras);
     }
-    return savedFloodAreas;
+    return filtered;
   }, [savedFloodAreas, filtroAtivo]);
 
   const adicionarPontoNaArea = useCallback(
@@ -1036,8 +1052,24 @@ export function useMapViewModel() {
         : await reporteRepository.prepararUploads(selectedMedia);
       let successMessage = 'Reporte enviado com sucesso.';
 
-      if (isDrawing) {
-        const orderedCoordinates = ordenarPontosPoligono(drawingCoordinates);
+      if (isDrawing || (selectedPoint && tipo === 'alagamento')) {
+        let orderedCoordinates: Coordenadas[] = [];
+        
+        if (isDrawing) {
+          orderedCoordinates = ordenarPontosPoligono(drawingCoordinates);
+        } else {
+          // Cria um pequeno polígono ao redor do ponto para garantir a tag de area válida
+          const lat = selectedPoint!.latitude;
+          const lng = selectedPoint!.longitude;
+          const r = 0.0001; // ~11 metros
+          orderedCoordinates = [
+            { latitude: lat + r, longitude: lng - r },
+            { latitude: lat + r, longitude: lng + r },
+            { latitude: lat - r, longitude: lng + r },
+            { latitude: lat - r, longitude: lng - r },
+          ];
+        }
+
         const floodArea: FloodArea = {
           id: `flood-${Date.now()}-${Math.random().toString(36).slice(2)}`,
           coordinates: orderedCoordinates,
@@ -1057,26 +1089,6 @@ export function useMapViewModel() {
         successMessage = isOfflineWeb
           ? 'Área de alagamento salva no aparelho e será sincronizada quando a rede voltar.'
           : 'Área de alagamento enviada com sucesso.';
-      } else if (selectedPoint && tipo === 'alagamento') {
-        const reporte: Reporte = {
-          id: `report-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-          tipo,
-          latitude: selectedPoint.latitude,
-          longitude: selectedPoint.longitude,
-          endereco: endereco || 'Endereço não informado',
-          nivel,
-          descricao: descricao.trim() || '',
-          fotoUri: midiasUri[0] || null,
-          midiasUri,
-          mediaUploads: uploadedMedia,
-          dataHora: new Date().toISOString(),
-        };
-        await reporteRepository.adicionarReporte(reporte);
-        const atualizados = await reporteRepository.carregarReportes();
-        setSavedReportes(atualizados);
-        successMessage = isOfflineWeb
-          ? 'Alagamento salvo no aparelho e será sincronizado quando a rede voltar.'
-          : 'Alagamento enviado com sucesso.';
       } else if (selectedPoint && tipo === 'bueiro') {
          const manhole: Manhole = {
            id: `manhole-${Date.now()}-${Math.random().toString(36).slice(2)}`,

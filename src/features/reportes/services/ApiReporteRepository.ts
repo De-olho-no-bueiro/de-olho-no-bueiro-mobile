@@ -174,9 +174,8 @@ export class ApiReporteRepository implements IReporteRepository {
       if (!response.ok) return getCachedReportes();
       const data = await response.json();
       const mapped = data.map(mapPostToReporte);
-      const merged = dedupeById([...(await getCachedReportes()), ...mapped]);
-      await cacheReportes(merged);
-      return merged;
+      await cacheReportes(mapped);
+      return getCachedReportes();
     } catch {
       return getCachedReportes();
     }
@@ -241,9 +240,8 @@ export class ApiReporteRepository implements IReporteRepository {
           mediaUploads,
         };
       });
-      const merged = dedupeById([...(await getCachedManholes()), ...mapped]);
-      await cacheManholes(merged);
-      return merged;
+      await cacheManholes(mapped);
+      return getCachedManholes();
     } catch {
       return getCachedManholes();
     }
@@ -316,9 +314,8 @@ export class ApiReporteRepository implements IReporteRepository {
           mediaUploads,
         };
       });
-      const merged = dedupeById([...(await getCachedFloodAreas()), ...mapped]);
-      await cacheFloodAreas(merged);
-      return merged;
+      await cacheFloodAreas(mapped);
+      return getCachedFloodAreas();
     } catch {
       return getCachedFloodAreas();
     }
@@ -505,9 +502,8 @@ export class ApiReporteRepository implements IReporteRepository {
       if (!response.ok) return getCachedHistory();
       const data = await response.json();
       const mapped = data.map(mapPostToReporte);
-      const merged = dedupeById([...(await getCachedHistory()), ...mapped]);
-      await cacheHistory(merged);
-      return merged;
+      await cacheHistory(mapped);
+      return getCachedHistory();
     } catch {
       return getCachedHistory();
     }
