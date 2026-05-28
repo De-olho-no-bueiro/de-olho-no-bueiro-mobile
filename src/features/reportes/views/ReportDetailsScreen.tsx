@@ -9,9 +9,10 @@ import {
   KeyboardAvoidingView,
   Platform,
   Keyboard,
-  Dimensions,
   Pressable,
   Share,
+  Modal,
+  useWindowDimensions,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Image } from 'expo-image';
@@ -27,13 +28,11 @@ import { Colors } from '@/core/constants/theme';
 import { useReportDetailsViewModel } from '../viewmodels/useReportDetailsViewModel';
 import { detailsStyles as styles } from './styles/detailsStyles';
 import { useAuth } from '@/core/contexts/auth-context';
+import { navigateBackOrFallback } from '@/core/utils/navigation';
 import type { Comment } from '@/features/reportes/services/ApiCommentRepository';
 import { getMediaUrl } from '@/core/utils/api-config';
 
-const { width } = Dimensions.get('window');
 const POST_CARD_HORIZONTAL_MARGIN = 12;
-const POST_CARD_WIDTH = width - POST_CARD_HORIZONTAL_MARGIN * 2;
-const MEDIA_HEIGHT = Math.round(POST_CARD_WIDTH * 0.75);
 
 const LEVEL_CONFIG = {
   baixo: { label: 'Baixo', color: '#34C759', bg: 'rgba(52, 199, 89, 0.15)' },
@@ -58,11 +57,16 @@ export function ReportDetailsScreen() {
   const themeColors = isDark ? Colors.dark : Colors.light;
   const vm = useReportDetailsViewModel();
   const { user } = useAuth();
+  const { width } = useWindowDimensions();
 
   const [newComment, setNewComment] = useState('');
   const [currentPage, setCurrentPage] = useState(0);
   const [editingComment, setEditingComment] = useState<Comment | null>(null);
+  const [verifyModalVisible, setVerifyModalVisible] = useState(false);
+  const [verificationChoice, setVerificationChoice] = useState<boolean | null>(null);
   const canSubmitComment = Boolean(newComment.trim()) && !vm.commentSubmitting;
+  const postCardWidth = Math.max(0, width - POST_CARD_HORIZONTAL_MARGIN * 2);
+  const mediaHeight = Math.round(postCardWidth * 0.75);
 
   const handleSendComment = async () => {
     if (!newComment.trim() || vm.commentSubmitting) return;
@@ -98,7 +102,10 @@ export function ReportDetailsScreen() {
       <View style={[styles.container, { backgroundColor: themeColors.background }, styles.centeredState, styles.emptyState]}>
         <Feather name="alert-circle" size={48} color={themeColors.icon} style={styles.emptyStateIcon} />
         <ThemedText style={styles.emptyStateTitle}>Reporte não encontrado.</ThemedText>
-        <TouchableOpacity style={styles.emptyStateBackButton} onPress={() => router.back()}>
+        <TouchableOpacity
+          style={styles.emptyStateBackButton}
+          onPress={() => navigateBackOrFallback(router)}
+        >
           <ThemedText style={{ color: themeColors.tint }}>Voltar ao mapa</ThemedText>
         </TouchableOpacity>
       </View>
@@ -169,7 +176,7 @@ export function ReportDetailsScreen() {
     (data.latitude != null && data.longitude != null
       ? `Coordenadas: ${data.latitude.toFixed(6)}, ${data.longitude.toFixed(6)}`
       : 'Localização não disponível');
-  const showVerificationPrompt = data.postId || data.id;
+  const showVerificationPrompt = Boolean(data.postId || data.id);
 
   const handleCommentOptions = (comment: Comment) => {
     Alert.alert('Comentário', 'Escolha uma ação.', [
@@ -204,23 +211,37 @@ export function ReportDetailsScreen() {
     ]);
   };
 
-  const handleVerify = () => {
-    Alert.alert('Esse incidente continua?', 'Sua resposta ajuda a manter mapa limpo.', [
-      { text: 'Cancelar', style: 'cancel' },
-      {
-        text: 'Sim, ainda está',
-        onPress: async () => {
-          await vm.verificarIncidente(true);
-        },
-      },
-      {
-        text: 'Não, resolvido',
-        style: 'destructive',
-        onPress: async () => {
-          await vm.verificarIncidente(false);
-        },
-      },
-    ]);
+  const handleOpenVerify = () => {
+    if (!vm.verificationTargetId) {
+      Alert.alert(
+        'Verificação indisponível',
+        'Esse reporte ainda não foi sincronizado com o servidor.',
+      );
+      return;
+    }
+
+    setVerificationChoice(null);
+    setVerifyModalVisible(true);
+  };
+
+  const handleSubmitVerify = async () => {
+    if (verificationChoice === null) {
+      Alert.alert('Selecione uma opção', 'Informe se o incidente ainda está acontecendo.');
+      return;
+    }
+
+    const success = await vm.verificarIncidente(verificationChoice);
+    if (!success) {
+      Alert.alert('Erro', 'Não foi possível registrar sua verificação agora.');
+      return;
+    }
+
+    setVerifyModalVisible(false);
+    setVerificationChoice(null);
+    Alert.alert(
+      'Verificação enviada',
+      verificationChoice ? 'Marcamos o incidente como ativo.' : 'Marcamos o incidente como resolvido.',
+    );
   };
 
   return (
@@ -239,7 +260,7 @@ export function ReportDetailsScreen() {
               borderColor,
             },
           ]}
-          onPress={() => router.back()}
+          onPress={() => navigateBackOrFallback(router)}
         >
           <IconSymbol name="chevron.left" size={22} color={textPrimary} />
         </TouchableOpacity>
@@ -293,7 +314,7 @@ export function ReportDetailsScreen() {
                 </View>
               </View>
 
-              <View style={[styles.mediaContainer, { backgroundColor: mediaBg, height: MEDIA_HEIGHT }]}>
+              <View style={[styles.mediaContainer, { backgroundColor: mediaBg, height: mediaHeight }]}>
                 {hasImages ? (
                   <>
                     <ScrollView
@@ -313,7 +334,7 @@ export function ReportDetailsScreen() {
                         <Image
                           key={`${uri}-${index}`}
                           source={{ uri }}
-                          style={[styles.mediaImage, { height: MEDIA_HEIGHT, width: POST_CARD_WIDTH }]}
+                          style={[styles.mediaImage, { height: mediaHeight, width: postCardWidth }]}
                           contentFit="cover"
                         />
                       ))}
@@ -344,44 +365,47 @@ export function ReportDetailsScreen() {
                     )}
                   </>
                 ) : (
-                  <View style={[styles.mediaPlaceholder, { backgroundColor: mediaBg, height: MEDIA_HEIGHT }]}>
+                  <View style={[styles.mediaPlaceholder, { backgroundColor: mediaBg, height: mediaHeight }]}>
                     <MaterialIcons name="landscape" size={92} color={isDark ? '#4B5563' : '#9CA3AF'} />
                   </View>
                 )}
               </View>
 
               <View style={styles.actionsRow}>
-                <Pressable style={styles.actionButton} onPress={handleLike} disabled={vm.liking}>
-                  <IconSymbol
-                    name={liked ? 'heart.fill' : 'heart'}
-                    size={28}
-                    color={liked ? '#FF3B30' : textPrimary}
-                  />
-                  <ThemedText style={[styles.actionLabel, { color: liked ? '#FF3B30' : textPrimary }]}>
-                    {likeCount}
-                  </ThemedText>
-                </Pressable>
-
-                <Pressable style={styles.actionButton}>
-                  <IconSymbol name="bubble.right" size={24} color={textPrimary} />
-                  <ThemedText style={[styles.actionLabel, { color: textPrimary }]}>
-                    {comments.length}
-                  </ThemedText>
-                </Pressable>
-
-                {showVerificationPrompt ? (
-                  <Pressable style={styles.actionButton} onPress={handleVerify}>
-                    <MaterialCommunityIcons name="shield-alert" size={22} color={textPrimary} />
-                    <ThemedText style={[styles.actionLabel, { color: textPrimary }]}>
-                      Verificar
+                <View style={styles.actionsPrimaryGroup}>
+                  <Pressable style={styles.actionButton} onPress={handleLike} disabled={vm.liking}>
+                    <IconSymbol
+                      name={liked ? 'heart.fill' : 'heart'}
+                      size={28}
+                      color={liked ? '#FF3B30' : textPrimary}
+                    />
+                    <ThemedText style={[styles.actionLabel, { color: liked ? '#FF3B30' : textPrimary }]}>
+                      {likeCount}
                     </ThemedText>
                   </Pressable>
-                ) : null}
 
-                <Pressable
-                  style={[styles.actionButton, { marginLeft: 'auto' }]}
-                  onPress={handleShare}
-                >
+                  <Pressable style={styles.actionButton}>
+                    <IconSymbol name="bubble.right" size={24} color={textPrimary} />
+                    <ThemedText style={[styles.actionLabel, { color: textPrimary }]}>
+                      {comments.length}
+                    </ThemedText>
+                  </Pressable>
+
+                  {showVerificationPrompt ? (
+                    <Pressable style={styles.actionButton} onPress={handleOpenVerify} disabled={vm.verifying}>
+                      {vm.verifying ? (
+                        <ActivityIndicator size="small" color={textPrimary} />
+                      ) : (
+                        <MaterialCommunityIcons name="shield-alert" size={22} color={textPrimary} />
+                      )}
+                      <ThemedText style={[styles.actionLabel, { color: textPrimary }]}>
+                        Verificar
+                      </ThemedText>
+                    </Pressable>
+                  ) : null}
+                </View>
+
+                <Pressable style={styles.shareActionButton} onPress={handleShare}>
                   <IconSymbol name="square.and.arrow.up" size={24} color={textPrimary} />
                 </Pressable>
               </View>
@@ -524,6 +548,120 @@ export function ReportDetailsScreen() {
           </View>
         </View>
       </ThemedView>
+
+      <Modal
+        visible={verifyModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          if (!vm.verifying) {
+            setVerifyModalVisible(false);
+            setVerificationChoice(null);
+          }
+        }}
+      >
+        <View style={styles.verifyOverlay}>
+          <View
+            style={[
+              styles.verifyCard,
+              { backgroundColor: cardBg, borderColor },
+            ]}
+          >
+            <ThemedText style={[styles.verifyTitle, { color: textPrimary }]}>
+              Verificar incidente
+            </ThemedText>
+            <ThemedText style={[styles.verifyDescription, { color: textSecondary }]}>
+              Esse problema ainda está acontecendo nesse local?
+            </ThemedText>
+
+            <Pressable
+              style={[
+                styles.verifyOption,
+                {
+                  backgroundColor:
+                    verificationChoice === true
+                      ? 'rgba(52, 199, 89, 0.14)'
+                      : inputBg,
+                  borderColor:
+                    verificationChoice === true ? '#34C759' : borderColor,
+                },
+              ]}
+              onPress={() => setVerificationChoice(true)}
+            >
+              <View style={[styles.verifyOptionIcon, { backgroundColor: 'rgba(52, 199, 89, 0.16)' }]}>
+                <Feather name="check-circle" size={18} color="#34C759" />
+              </View>
+              <View style={styles.verifyOptionTextBlock}>
+                <ThemedText style={[styles.verifyOptionTitle, { color: textPrimary }]}>
+                  Sim, ainda está acontecendo
+                </ThemedText>
+                <ThemedText style={[styles.verifyOptionText, { color: textSecondary }]}>
+                  Mantém o alerta ativo no mapa.
+                </ThemedText>
+              </View>
+            </Pressable>
+
+            <Pressable
+              style={[
+                styles.verifyOption,
+                {
+                  backgroundColor:
+                    verificationChoice === false
+                      ? 'rgba(255, 59, 48, 0.12)'
+                      : inputBg,
+                  borderColor:
+                    verificationChoice === false ? '#FF3B30' : borderColor,
+                },
+              ]}
+              onPress={() => setVerificationChoice(false)}
+            >
+              <View style={[styles.verifyOptionIcon, { backgroundColor: 'rgba(255, 59, 48, 0.12)' }]}>
+                <Feather name="x-circle" size={18} color="#FF3B30" />
+              </View>
+              <View style={styles.verifyOptionTextBlock}>
+                <ThemedText style={[styles.verifyOptionTitle, { color: textPrimary }]}>
+                  Não, foi resolvido
+                </ThemedText>
+                <ThemedText style={[styles.verifyOptionText, { color: textSecondary }]}>
+                  Ajuda a retirar o alerta quando o local já estiver normalizado.
+                </ThemedText>
+              </View>
+            </Pressable>
+
+            <View style={styles.verifyActionsRow}>
+              <TouchableOpacity
+                style={[styles.verifySecondaryButton, { borderColor }]}
+                onPress={() => {
+                  setVerifyModalVisible(false);
+                  setVerificationChoice(null);
+                }}
+                disabled={vm.verifying}
+              >
+                <ThemedText style={[styles.verifySecondaryButtonText, { color: textPrimary }]}>
+                  Cancelar
+                </ThemedText>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.verifyPrimaryButton,
+                  (verificationChoice === null || vm.verifying) && styles.verifyPrimaryButtonDisabled,
+                ]}
+                onPress={handleSubmitVerify}
+                disabled={verificationChoice === null || vm.verifying}
+              >
+                {vm.verifying ? (
+                  <ActivityIndicator size="small" color="#FFF" />
+                ) : (
+                  <ThemedText style={styles.verifyPrimaryButtonText}>
+                    Enviar
+                  </ThemedText>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }

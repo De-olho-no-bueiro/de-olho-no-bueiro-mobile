@@ -1,6 +1,6 @@
 import React from 'react';
 import Constants from 'expo-constants';
-import { View, StyleSheet, Text, Platform, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, Text, Platform, TouchableOpacity, Pressable, useWindowDimensions } from 'react-native';
 import MapView, { Marker, Polygon, Callout, Circle } from 'react-native-maps';
 import { Ionicons } from '@expo/vector-icons';
 import type { TipoReporte, NivelAlagamento, Manhole, FloodArea } from '@/features/reportes/models/Reporte';
@@ -31,6 +31,7 @@ interface MapViewComponentProps {
   }[];
   savedManholes: Manhole[];
   savedFloodAreas: FloodArea[];
+  isDrawing: boolean;
   drawingCoordinates: { latitude: number; longitude: number }[];
   selectedPoint: { latitude: number; longitude: number } | null;
   colors: any;
@@ -51,7 +52,7 @@ type CalloutPayload = {
 
 type CalloutCardPayload = Omit<CalloutPayload, 'coordinate'>;
 
-const ANDROID_CALLOUT_WIDTH = 260;
+const ANDROID_CALLOUT_MAX_WIDTH = 260;
 const ANDROID_CALLOUT_HORIZONTAL_MARGIN = 12;
 const ANDROID_CALLOUT_VERTICAL_OFFSET = 170;
 const ANDROID_CALLOUT_TOP_MARGIN = 16;
@@ -87,12 +88,14 @@ export default function MapViewComponent({
   savedReportes,
   savedManholes,
   savedFloodAreas,
+  isDrawing: _isDrawing,
   drawingCoordinates,
   selectedPoint,
   colors,
   tintColor,
   androidBottomOverlayInset = 0,
 }: MapViewComponentProps) {
+  const { width: windowWidth } = useWindowDimensions();
   const reportMarkerRefs = React.useRef<Record<string, MarkerRef | null>>({});
   const manholeMarkerRefs = React.useRef<Record<string, MarkerRef | null>>({});
   const floodMarkerRefs = React.useRef<Record<string, MarkerRef | null>>({});
@@ -102,6 +105,10 @@ export default function MapViewComponent({
   const [androidCalloutHeight, setAndroidCalloutHeight] = React.useState(ANDROID_CALLOUT_ESTIMATED_HEIGHT);
   const [mapLayout, setMapLayout] = React.useState({ width: 0, height: 0 });
   const isAndroid = Platform.OS === 'android';
+  const calloutWidth = React.useMemo(() => {
+    const availableWidth = (mapLayout.width || windowWidth) - ANDROID_CALLOUT_HORIZONTAL_MARGIN * 2;
+    return Math.max(200, Math.min(ANDROID_CALLOUT_MAX_WIDTH, availableWidth));
+  }, [mapLayout.width, windowWidth]);
 
   const closeAndroidCallout = React.useCallback(() => {
     setAndroidCallout(null);
@@ -185,17 +192,17 @@ export default function MapViewComponent({
         </View>
       </View>
     ),
-    [],
+    [calloutWidth],
   );
 
   const renderCalloutContent = React.useCallback(
     (payload: CalloutCardPayload) => (
-      <View style={styles.calloutWrapper}>
+      <View style={[styles.calloutWrapper, { width: calloutWidth }]}>
         {renderCalloutCard({ payload })}
         <View style={styles.calloutArrow} />
       </View>
     ),
-    [renderCalloutCard],
+    [renderCalloutCard, calloutWidth],
   );
 
   const renderNativeCallout = React.useCallback(
@@ -224,12 +231,12 @@ export default function MapViewComponent({
 
     const left = Math.min(
       Math.max(
-        androidCalloutPoint.x - ANDROID_CALLOUT_WIDTH / 2,
+        androidCalloutPoint.x - calloutWidth / 2,
         ANDROID_CALLOUT_HORIZONTAL_MARGIN,
       ),
       Math.max(
         ANDROID_CALLOUT_HORIZONTAL_MARGIN,
-        mapLayout.width - ANDROID_CALLOUT_WIDTH - ANDROID_CALLOUT_HORIZONTAL_MARGIN,
+        mapLayout.width - calloutWidth - ANDROID_CALLOUT_HORIZONTAL_MARGIN,
       ),
     );
 
@@ -246,7 +253,7 @@ export default function MapViewComponent({
 
     const arrowLeft = Math.min(
       Math.max(androidCalloutPoint.x - left - 16, 20),
-      ANDROID_CALLOUT_WIDTH - 36,
+      calloutWidth - 36,
     );
 
     return { left, top, arrowLeft };
@@ -254,6 +261,7 @@ export default function MapViewComponent({
     androidBottomOverlayInset,
     androidCalloutHeight,
     androidCalloutPoint,
+    calloutWidth,
     mapLayout.height,
     mapLayout.width,
   ]);
@@ -526,6 +534,7 @@ export default function MapViewComponent({
           style={[
             styles.androidCalloutContainer,
             {
+              width: calloutWidth,
               left: androidCalloutStyle.left,
               top: androidCalloutStyle.top,
             },
@@ -645,7 +654,6 @@ const styles = StyleSheet.create({
   calloutWrapper: {
     alignItems: 'center',
     justifyContent: 'center',
-    width: 260,
   },
   calloutBubble: {
     backgroundColor: '#fff',
@@ -720,7 +728,6 @@ const styles = StyleSheet.create({
   },
   androidCalloutContainer: {
     position: 'absolute',
-    width: ANDROID_CALLOUT_WIDTH,
     zIndex: 20,
     elevation: 20,
   },

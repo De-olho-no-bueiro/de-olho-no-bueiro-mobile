@@ -22,6 +22,7 @@ import { Colors, Layout } from "@/core/constants/theme";
 import { useColorScheme } from "@/core/hooks/use-color-scheme";
 import {
   FiltroOpcao,
+  SearchSuggestionItem,
   useMapViewModel,
 } from "@/features/reportes/viewmodels/useMapViewModel";
 import { Image } from "expo-image";
@@ -127,6 +128,7 @@ export function MapScreen() {
   const loadingOverlayBg = isDark
     ? "rgba(0,0,0,0.75)"
     : "rgba(255,255,255,0.9)";
+  const isMapLoading = vm.isMapBootstrapping;
 
   const androidCalloutBottomInset =
     vm.isDrawing
@@ -198,14 +200,18 @@ export function MapScreen() {
 
           <SearchDropdown
             visible={vm.showSuggestions}
+            showEmptyState={
+              vm.searchHasResolved &&
+              !vm.searching &&
+              !vm.searchError &&
+              vm.searchSuggestions.length === 0
+            }
             items={vm.searchSuggestions}
             backgroundColor={colors.surface}
             borderColor={colors.border}
-            getKey={(_, index) => `search-${index}`}
-            getLabel={(addr: any) =>
-              [addr.street, addr.streetNumber, addr.district, addr.city]
-                .filter(Boolean)
-                .join(", ") || "Localização encontrada"
+            getKey={(item) => item.id}
+            getLabel={(item: SearchSuggestionItem) =>
+              item.label || "Localização encontrada"
             }
             onSelect={(item) => {
               Keyboard.dismiss();
@@ -270,25 +276,35 @@ export function MapScreen() {
         </ScrollView>
       </View>
 
-      <MapViewComponent
-        mapRef={vm.mapRef}
-        region={vm.mapRegion}
-        onPress={handleMapPress}
-        onCalloutPress={(id, tipo) =>
-          router.push({
-            pathname: "/(tabs)/report/[id]" as any,
-            params: { id, tipo },
-          })
-        }
-        savedReportes={vm.getFilteredReportes()}
-        savedManholes={vm.getFilteredManholes()}
-        savedFloodAreas={vm.getFilteredFloodAreas()}
-        drawingCoordinates={vm.drawingCoordinates}
-        selectedPoint={vm.selectedPoint}
-        colors={colors}
-        tintColor={colors.tint}
-        androidBottomOverlayInset={androidCalloutBottomInset}
-      />
+      {isMapLoading ? (
+        <View
+          style={[
+            styles.mapLoadingPlaceholder,
+            { backgroundColor: colors.background },
+          ]}
+        />
+      ) : (
+        <MapViewComponent
+          mapRef={vm.mapRef}
+          region={vm.mapRegion}
+          onPress={handleMapPress}
+          onCalloutPress={(id, tipo) =>
+            router.push({
+              pathname: "/(tabs)/report/[id]" as any,
+              params: { id, tipo },
+            })
+          }
+          savedReportes={vm.getFilteredReportes()}
+          savedManholes={vm.getFilteredManholes()}
+          savedFloodAreas={vm.getFilteredFloodAreas()}
+          isDrawing={vm.isDrawing}
+          drawingCoordinates={vm.drawingCoordinates}
+          selectedPoint={vm.selectedPoint}
+          colors={colors}
+          tintColor={colors.tint}
+          androidBottomOverlayInset={androidCalloutBottomInset}
+        />
+      )}
 
       <TouchableOpacity
         style={[
@@ -309,13 +325,13 @@ export function MapScreen() {
         <MaterialIcons name="my-location" size={24} color={colors.tint} />
       </TouchableOpacity>
 
-      {vm.loadingLocation && (
+      {isMapLoading && (
         <View
           style={[styles.loadingOverlay, { backgroundColor: loadingOverlayBg }]}
         >
           <ActivityIndicator size="large" color={colors.tint} />
           <ThemedText style={styles.loadingText}>
-            Obtendo sua localização...
+            Preparando mapa e localização...
           </ThemedText>
         </View>
       )}
@@ -334,7 +350,7 @@ export function MapScreen() {
           <View style={styles.drawingControls}>
             <ThemedText style={styles.drawingHint}>
               Modo Desenho ({vm.drawingCoordinates.length} pt). Escolha no
-              mínimo 3 pontos no mapa e confirme.
+              mínimo 3 e no máximo 4 pontos no mapa para formar a área.
             </ThemedText>
 
             <View style={{ flexDirection: "row", gap: 8, marginTop: 8 }}>
@@ -566,7 +582,7 @@ export function MapScreen() {
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.button, { backgroundColor: colors.tint }]}
-              onPress={vm.usarMinhaLocalizacao}
+              onPress={vm.abrirReporteDeAlagamentoNaMinhaLocalizacao}
               disabled={vm.loadingLocation}
             >
               <IconSymbol
@@ -580,7 +596,7 @@ export function MapScreen() {
                   { color: isDark ? colors.background : "#fff" },
                 ]}
               >
-                Usar minha localização
+                Adicionar minha localização
               </ThemedText>
             </TouchableOpacity>
             <TouchableOpacity
@@ -713,16 +729,25 @@ export function MapScreen() {
                 </>
               )}
 
-              <ThemedText style={styles.label}>
-                Endereço (automático)
-              </ThemedText>
+              <ThemedText style={styles.label}>Endereço</ThemedText>
               {vm.loadingAddress ? (
                 <ActivityIndicator size="small" color={colors.tint} />
-              ) : (
-                <ThemedText style={styles.endereco}>
-                  {vm.endereco || "—"}
-                </ThemedText>
-              )}
+              ) : null}
+              <TextInput
+                style={[
+                  styles.input,
+                  {
+                    color: colors.text,
+                    backgroundColor: colors.surface,
+                    borderColor: colors.border,
+                  },
+                ]}
+                placeholder="Digite ou ajuste o endereço"
+                placeholderTextColor={colors.icon}
+                value={vm.endereco}
+                onChangeText={vm.setEndereco}
+                multiline
+              />
 
               <ThemedText style={styles.label}>Descrição (opcional)</ThemedText>
               <TextInput
@@ -743,26 +768,77 @@ export function MapScreen() {
               />
 
               <ThemedText style={styles.label}>Mídia (opcional)</ThemedText>
-              <TouchableOpacity
-                style={[
-                  styles.fotoButton,
-                  {
-                    borderColor: colors.border,
-                    backgroundColor: colors.surface,
-                    marginBottom: vm.midiasUri.length > 0 ? 12 : 24,
-                    opacity: vm.midiasUri.length >= 6 ? 0.5 : 1,
-                  },
-                ]}
-                onPress={vm.escolherFoto}
-                disabled={vm.midiasUri.length >= 6}
-              >
-                <IconSymbol name="camera.fill" size={32} color={colors.icon} />
-                <ThemedText style={styles.fotoLabel}>
-                  {vm.midiasUri.length >= 6
-                    ? "Limite de 6 fotos atingido"
-                    : "Anexar foto"}
-                </ThemedText>
-              </TouchableOpacity>
+              {Platform.OS === "web" ? (
+                <View
+                  style={[
+                    styles.webPhotoActions,
+                    {
+                      marginBottom: vm.midiasUri.length > 0 ? 12 : 24,
+                    },
+                  ]}
+                >
+                  <TouchableOpacity
+                    style={[
+                      styles.webPhotoButton,
+                      {
+                        borderColor: colors.border,
+                        backgroundColor: colors.surface,
+                        opacity: vm.midiasUri.length >= 6 ? 0.5 : 1,
+                      },
+                    ]}
+                    onPress={vm.tirarFoto}
+                    disabled={vm.midiasUri.length >= 6}
+                  >
+                    <IconSymbol name="camera.fill" size={24} color={colors.icon} />
+                    <ThemedText style={styles.webPhotoButtonLabel}>
+                      {vm.midiasUri.length >= 6 ? "Limite atingido" : "Tirar foto"}
+                    </ThemedText>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[
+                      styles.webPhotoButton,
+                      {
+                        borderColor: colors.border,
+                        backgroundColor: colors.surface,
+                        opacity: vm.midiasUri.length >= 6 ? 0.5 : 1,
+                      },
+                    ]}
+                    onPress={vm.escolherDaGaleria}
+                    disabled={vm.midiasUri.length >= 6}
+                  >
+                    <MaterialIcons
+                      name="photo-library"
+                      size={24}
+                      color={colors.icon}
+                    />
+                    <ThemedText style={styles.webPhotoButtonLabel}>
+                      {vm.midiasUri.length >= 6 ? "Limite atingido" : "Escolher da galeria"}
+                    </ThemedText>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <TouchableOpacity
+                  style={[
+                    styles.fotoButton,
+                    {
+                      borderColor: colors.border,
+                      backgroundColor: colors.surface,
+                      marginBottom: vm.midiasUri.length > 0 ? 12 : 24,
+                      opacity: vm.midiasUri.length >= 6 ? 0.5 : 1,
+                    },
+                  ]}
+                  onPress={vm.escolherFoto}
+                  disabled={vm.midiasUri.length >= 6}
+                >
+                  <IconSymbol name="camera.fill" size={32} color={colors.icon} />
+                  <ThemedText style={styles.fotoLabel}>
+                    {vm.midiasUri.length >= 6
+                      ? "Limite de 6 fotos atingido"
+                      : "Anexar foto"}
+                  </ThemedText>
+                </TouchableOpacity>
+              )}
 
               {vm.midiasUri.length > 0 && (
                 <ScrollView
@@ -888,6 +964,9 @@ const styles = StyleSheet.create({
     flex: 1,
     width: "100%",
   },
+  mapLoadingPlaceholder: {
+    flex: 1,
+  },
   centered: {
     flex: 1,
     justifyContent: "center",
@@ -899,6 +978,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     gap: 12,
+    zIndex: 30,
   },
   loadingText: {
     fontSize: 16,
@@ -1061,6 +1141,26 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 24,
+  },
+  webPhotoActions: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  webPhotoButton: {
+    flex: 1,
+    minHeight: 96,
+    borderWidth: 2,
+    borderStyle: "dashed",
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 16,
+    gap: 8,
+  },
+  webPhotoButtonLabel: {
+    fontSize: 14,
+    textAlign: "center",
   },
   fotoPreview: {
     width: "100%",

@@ -8,6 +8,7 @@ import { ThemedView } from '@/core/components/atoms/themed-view';
 import { IconSymbol } from '@/core/components/atoms/icon-symbol';
 import { Colors } from '@/core/constants/theme';
 import { useColorScheme } from '@/core/hooks/use-color-scheme';
+import { navigateBackOrFallback } from '@/core/utils/navigation';
 import { ApiReporteRepository } from '@/features/reportes/services/ApiReporteRepository';
 import type { Reporte } from '@/features/reportes/models/Reporte';
 
@@ -64,7 +65,10 @@ export function ReportHistoryScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.header}>
-          <TouchableOpacity style={[styles.backButton, { borderColor: colors.border }]} onPress={() => router.back()}>
+          <TouchableOpacity
+            style={[styles.backButton, { borderColor: colors.border }]}
+            onPress={() => navigateBackOrFallback(router)}
+          >
             <IconSymbol name="chevron.left" size={18} color={colors.text} />
           </TouchableOpacity>
           <View style={styles.headerText}>
