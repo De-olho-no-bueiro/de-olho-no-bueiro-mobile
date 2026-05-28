@@ -17,14 +17,12 @@ const ThemePreferenceContext = createContext<ThemePreferenceContextValue | null>
 export function ThemePreferenceProvider({ children }: { children: React.ReactNode }) {
   const systemScheme = useRNColorScheme();
   const [themePreference, setThemePreferenceState] = useState<ThemePreference>('auto');
-  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     AsyncStorage.getItem(STORAGE_KEY).then((value) => {
       if (value === 'light' || value === 'dark' || value === 'auto') {
         setThemePreferenceState(value);
       }
-      setLoaded(true);
     });
   }, []);
 

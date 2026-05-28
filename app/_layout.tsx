@@ -2,23 +2,25 @@ import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
+import '../global.css';
 import { useEffect } from 'react';
-import '@/features/reportes/services/IncidentMonitoringService';
 
+import { NetworkStatusBanner } from '@/core/components/organisms/network-status-banner';
+import { PWAInstallCoach } from '@/core/components/organisms/pwa-install-coach';
+import { PWAShellRuntime } from '@/core/components/organisms/pwa-shell-runtime';
 import { ThemePreferenceProvider } from '@/core/contexts/theme-preference-context';
 import { useColorScheme } from '@/core/hooks/use-color-scheme';
 import { AuthProvider, useAuth } from '@/core/contexts/auth-context';
-import { View, ActivityIndicator } from 'react-native';
-import {
-  initializeIncidentMonitoring,
-  startIncidentMonitoring,
-  stopIncidentMonitoring,
-  subscribeToIncidentNotificationResponses,
-} from '@/features/reportes/services/IncidentMonitoringService';
+import { View, ActivityIndicator, StyleSheet } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { isWeb } from '@/core/utils/platform-capabilities';
 
 export const unstable_settings = {
   anchor: '(tabs)',
 };
+
+const ENABLE_INCIDENT_MONITORING =
+  process.env.EXPO_PUBLIC_ENABLE_INCIDENT_MONITORING === 'true';
 
 function RootLayoutContent() {
   const colorScheme = useColorScheme();
@@ -38,32 +40,76 @@ function RootLayoutContent() {
       // Redirect to tabs if logged in and trying to access auth screens
       router.replace('/(tabs)');
     }
-  }, [user, isLoading, segments]);
+  }, [user, isLoading, segments, router]);
 
   useEffect(() => {
-    initializeIncidentMonitoring().catch((error) => {
-      console.error('[IncidentMonitoring] init error', error);
-    });
+    if (!ENABLE_INCIDENT_MONITORING || isWeb) {
+      return;
+    }
 
-    const subscription = subscribeToIncidentNotificationResponses();
+    let isMounted = true;
+    let subscription: { remove: () => void } | null = null;
+
+    void (async () => {
+      try {
+        const incidentMonitoring = await import(
+          '@/features/reportes/services/IncidentMonitoringService'
+        );
+        if (!isMounted) {
+          return;
+        }
+
+        await incidentMonitoring.initializeIncidentMonitoring();
+        if (!isMounted) {
+          return;
+        }
+
+        subscription =
+          incidentMonitoring.subscribeToIncidentNotificationResponses();
+      } catch (error) {
+        console.error('[IncidentMonitoring] init error', error);
+      }
+    })();
+
     return () => {
-      subscription.remove();
+      isMounted = false;
+      subscription?.remove();
     };
   }, []);
 
   useEffect(() => {
-    if (isLoading) return;
-
-    if (!user) {
-      stopIncidentMonitoring().catch((error) => {
-        console.error('[IncidentMonitoring] stop error', error);
-      });
+    if (!ENABLE_INCIDENT_MONITORING || isLoading || isWeb) {
       return;
     }
 
-    startIncidentMonitoring().catch((error) => {
-      console.error('[IncidentMonitoring] start error', error);
-    });
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        const incidentMonitoring = await import(
+          '@/features/reportes/services/IncidentMonitoringService'
+        );
+        if (cancelled) {
+          return;
+        }
+
+        if (!user) {
+          await incidentMonitoring.stopIncidentMonitoring();
+          return;
+        }
+
+        await incidentMonitoring.startIncidentMonitoring();
+      } catch (error) {
+        console.error(
+          `[IncidentMonitoring] ${user ? 'start' : 'stop'} error`,
+          error,
+        );
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [user, isLoading]);
 
   if (isLoading) {
@@ -76,11 +122,20 @@ function RootLayoutContent() {
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
-      </Stack>
+      <View style={styles.appShell}>
+        <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
+        </Stack>
+        <PWAShellRuntime />
+        <View pointerEvents="box-none" style={styles.topOverlay}>
+          <NetworkStatusBanner />
+        </View>
+        <View pointerEvents="box-none" style={styles.bottomOverlay}>
+          <PWAInstallCoach />
+        </View>
+      </View>
       <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
     </ThemeProvider>
   );
@@ -88,10 +143,30 @@ function RootLayoutContent() {
 
 export default function RootLayout() {
   return (
-    <AuthProvider>
-      <ThemePreferenceProvider>
-        <RootLayoutContent />
-      </ThemePreferenceProvider>
-    </AuthProvider>
+    <SafeAreaProvider>
+      <AuthProvider>
+        <ThemePreferenceProvider>
+          <RootLayoutContent />
+        </ThemePreferenceProvider>
+      </AuthProvider>
+    </SafeAreaProvider>
   );
 }
+
+const styles = StyleSheet.create({
+  appShell: {
+    flex: 1,
+  },
+  topOverlay: {
+    left: 0,
+    position: 'absolute',
+    right: 0,
+    top: 0,
+  },
+  bottomOverlay: {
+    bottom: 0,
+    left: 0,
+    position: 'absolute',
+    right: 0,
+  },
+});

@@ -6,6 +6,7 @@ import { IconSymbol } from '@/core/components/atoms/icon-symbol';
 type SearchDropdownProps<T> = {
   items: T[];
   visible: boolean;
+  showEmptyState?: boolean;
   emptyText?: string;
   getKey: (item: T, index: number) => string;
   getLabel: (item: T) => string;
@@ -17,6 +18,7 @@ type SearchDropdownProps<T> = {
 export function SearchDropdown<T>({
   items,
   visible,
+  showEmptyState = true,
   emptyText = 'Nenhum resultado encontrado',
   getKey,
   getLabel,
@@ -25,6 +27,7 @@ export function SearchDropdown<T>({
   borderColor,
 }: SearchDropdownProps<T>) {
   if (!visible) return null;
+  if (items.length === 0 && !showEmptyState) return null;
 
   return (
     <View

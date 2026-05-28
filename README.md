@@ -1,50 +1,142 @@
-# Welcome to your Expo app 👋
+# De Olho no Bueiro Mobile
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Aplicativo mobile em Expo + React Native para registrar ocorrências, consultar incidentes próximos e acompanhar reportes de alagamento e bueiros.
 
-## Get started
+## O que este projeto entrega
 
-1. Install dependencies
+- Onboarding, login e cadastro
+- Mapa com ocorrências e pontos de interesse
+- Criação de reportes com localização
+- Histórico de reportes do usuário
+- Perfil e configurações
+- Suporte a Android, iOS e web/PWA
+- Recursos opcionais de mapa web e notificações push
 
-   ```bash
-   npm install
-   ```
+## Stack
 
-2. Start the app
+- Expo 54
+- React Native 0.81
+- Expo Router
+- TypeScript
+- NativeWind
 
-   ```bash
-   npx expo start
-   ```
+## Requisitos
 
-In the output, you'll find options to open the app in a
+### Para desenvolvimento geral
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+- Node.js 20+
+- npm 10+
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+### Para Android local
 
-## Get a fresh project
+- Java 21
+- Android SDK em `~/Android/Sdk` ou configurado via `ANDROID_HOME`
+- Pacotes do SDK:
+  - `platforms;android-36`
+  - `build-tools;36.0.0`
+  - `platform-tools`
+  - `ndk;27.1.12297006`
 
-When you're ready, run:
+## Variáveis de ambiente
 
-```bash
-npm run reset-project
+Crie um `.env` na raiz do projeto.
+
+Exemplo:
+
+```env
+EXPO_PUBLIC_API_URL=http://localhost:3001/api
+EXPO_PUBLIC_ENABLE_INCIDENT_MONITORING=false
+EXPO_PUBLIC_GOOGLE_MAPS_API_KEY=
+EXPO_PUBLIC_WEB_PUSH_VAPID_PUBLIC_KEY=
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+Notas:
 
-## Learn more
+- O fallback atual do app é `http://localhost:3000/api`, então configure `EXPO_PUBLIC_API_URL` explicitamente em desenvolvimento.
+- No Android Emulator, normalmente a API local deve ser `http://10.0.2.2:3001/api`.
+- Em dispositivo físico, use o IP da máquina na rede local, por exemplo `http://192.168.x.x:3001/api`.
+- `EXPO_PUBLIC_GOOGLE_MAPS_API_KEY` habilita mapa web e configuração nativa do Google Maps no Android.
 
-To learn more about developing your project with Expo, look at the following resources:
+## Como rodar localmente
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+1. Instale dependências:
 
-## Join the community
+```bash
+npm install
+```
 
-Join our community of developers creating universal apps.
+2. Configure o `.env`
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+3. Inicie o projeto:
+
+```bash
+npm run start
+```
+
+4. Depois escolha a plataforma:
+
+```bash
+npm run android
+npm run ios
+npm run web:dev
+```
+
+## Validação local
+
+```bash
+npm run lint
+npx tsc --noEmit
+npx expo-doctor
+```
+
+## Build Android local
+
+Use o script auxiliar do projeto:
+
+```bash
+./scripts/android-local-build.sh debug
+./scripts/android-local-build.sh release
+```
+
+Saídas esperadas:
+
+- Debug: `android/app/build/outputs/apk/debug/app-debug.apk`
+- Release: `android/app/build/outputs/apk/release/app-release.apk`
+
+## Estrutura resumida
+
+```text
+app/
+├─ (auth)/
+├─ (tabs)/
+└─ *.tsx
+
+src/
+├─ core/
+└─ features/
+   ├─ auth/
+   ├─ configuracoes/
+   └─ reportes/
+```
+
+## Scripts úteis
+
+```bash
+npm run start
+npm run android
+npm run ios
+npm run web:dev
+npm run build:web
+npm run lint
+```
+
+## Observações importantes
+
+- O build `release` atual gera APK assinado com `debug.keystore`; isso não é suficiente para distribuição real.
+- Recursos de mapa web dependem de `EXPO_PUBLIC_GOOGLE_MAPS_API_KEY`.
+- Notificações web exigem `EXPO_PUBLIC_WEB_PUSH_VAPID_PUBLIC_KEY`.
+- O backend recomendado para desenvolvimento é o projeto `Backend` deste workspace.
+
+## Contribuição
+
+Leia [CONTRIBUTING.md](./CONTRIBUTING.md) para setup, checklist e padrão de contribuição.

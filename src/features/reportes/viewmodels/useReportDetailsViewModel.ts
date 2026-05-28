@@ -1,7 +1,25 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useLocalSearchParams } from 'expo-router';
 import { ApiReporteRepository } from '@/features/reportes/services/ApiReporteRepository';
 import { ApiCommentRepository, Comment } from '@/features/reportes/services/ApiCommentRepository';
+
+function isLocalOnlyId(id: string): boolean {
+  return /^(report|manhole|flood)-/.test(id);
+}
+
+function resolveVerificationTargetId(data: any, postIdParam?: string): string | null {
+  const preferredId = data?.postId || postIdParam;
+  if (preferredId) {
+    return String(preferredId);
+  }
+
+  const fallbackId = data?.id ? String(data.id) : '';
+  if (!fallbackId || isLocalOnlyId(fallbackId)) {
+    return null;
+  }
+
+  return fallbackId;
+}
 
 export function useReportDetailsViewModel() {
   const params = useLocalSearchParams();
@@ -13,13 +31,15 @@ export function useReportDetailsViewModel() {
   const [data, setData] = useState<any>(null);
   const [comments, setComments] = useState<Comment[]>([]);
   const [liking, setLiking] = useState(false);
-  const commentRepo = new ApiCommentRepository();
-  const reporteRepo = new ApiReporteRepository();
+  const [verifying, setVerifying] = useState(false);
+  const [commentSubmitting, setCommentSubmitting] = useState(false);
+  const commentRepoRef = useRef(new ApiCommentRepository());
+  const reporteRepoRef = useRef(new ApiReporteRepository());
 
-  const loadComments = async (targetPostId: string) => {
-    const apiComments = await commentRepo.getComments(targetPostId);
+  const loadComments = useCallback(async (targetPostId: string) => {
+    const apiComments = await commentRepoRef.current.getComments(targetPostId);
     setComments(apiComments);
-  };
+  }, []);
 
   useEffect(() => {
     async function loadData() {
@@ -29,18 +49,18 @@ export function useReportDetailsViewModel() {
         let found: any = null;
 
         if (postIdParam) {
-          found = await reporteRepo.carregarDetalhePost(postIdParam);
+          found = await reporteRepoRef.current.carregarDetalhePost(postIdParam);
         } else if (tipo === 'bueiro') {
-          const manholes = await reporteRepo.carregarManholes();
+          const manholes = await reporteRepoRef.current.carregarManholes();
           found = manholes.find((m) => m.id === id);
         } else if (tipo === 'alagamento') {
-          const areas = await reporteRepo.carregarFloodAreas();
+          const areas = await reporteRepoRef.current.carregarFloodAreas();
           found = areas.find((a) => a.id === id);
         }
 
         // Fallback genérico: se for um marcador de alagamento pontual (não polígono) ou tipo não mapeado
         if (!found) {
-           const reportes = await reporteRepo.carregarReportes();
+           const reportes = await reporteRepoRef.current.carregarReportes();
            found = reportes.find((r) => r.id === id);
         }
 
@@ -57,28 +77,41 @@ export function useReportDetailsViewModel() {
     }
     
     loadData();
-  }, [id, tipo, postIdParam]);
+  }, [id, tipo, postIdParam, loadComments]);
 
   const enviarComentario = async (text: string) => {
-    if (!id || !text || !data) return;
+    if (!id || !text || !data || commentSubmitting) return false;
     const targetPostId = String(data.postId || postIdParam || data.id);
-    const newComment = await commentRepo.addComment(targetPostId, text);
-    if (newComment) {
-      setComments((prev) => [...prev, newComment]);
+    setCommentSubmitting(true);
+    try {
+      const newComment = await commentRepoRef.current.addComment(targetPostId, text);
+      if (newComment) {
+        setComments((prev) => [...prev, newComment]);
+        return true;
+      }
+      return false;
+    } finally {
+      setCommentSubmitting(false);
     }
   };
 
   const editarComentario = async (commentId: string, text: string) => {
-    const updatedComment = await commentRepo.updateComment(commentId, text);
-    if (updatedComment) {
-      setComments((prev) => prev.map((comment) => (comment.id === commentId ? updatedComment : comment)));
-      return true;
+    if (commentSubmitting) return false;
+    setCommentSubmitting(true);
+    try {
+      const updatedComment = await commentRepoRef.current.updateComment(commentId, text);
+      if (updatedComment) {
+        setComments((prev) => prev.map((comment) => (comment.id === commentId ? updatedComment : comment)));
+        return true;
+      }
+      return false;
+    } finally {
+      setCommentSubmitting(false);
     }
-    return false;
   };
 
   const excluirComentario = async (commentId: string) => {
-    const success = await commentRepo.deleteComment(commentId);
+    const success = await commentRepoRef.current.deleteComment(commentId);
     if (success) {
       setComments((prev) => prev.filter((comment) => comment.id !== commentId));
     }
@@ -90,7 +123,7 @@ export function useReportDetailsViewModel() {
     const targetPostId = String(data.postId || postIdParam || data.id);
     setLiking(true);
     try {
-      const result = await reporteRepo.toggleLike(targetPostId);
+      const result = await reporteRepoRef.current.toggleLike(targetPostId);
       if (result) {
         setData((prev: any) => prev ? { ...prev, ...result } : prev);
       }
@@ -101,13 +134,20 @@ export function useReportDetailsViewModel() {
 
   const verificarIncidente = async (isStillHappening: boolean) => {
     if (!data) return false;
-    const targetPostId = String(data.postId || postIdParam || data.id);
-    const result = await reporteRepo.verifyPost(targetPostId, isStillHappening);
-    if (result) {
-      setData((prev: any) => prev ? { ...prev, ...result } : prev);
-      return true;
+    const targetPostId = resolveVerificationTargetId(data, postIdParam);
+    if (!targetPostId) return false;
+
+    setVerifying(true);
+    try {
+      const result = await reporteRepoRef.current.verifyPost(targetPostId, isStillHappening);
+      if (result) {
+        setData((prev: any) => prev ? { ...prev, ...result } : prev);
+        return true;
+      }
+      return false;
+    } finally {
+      setVerifying(false);
     }
-    return false;
   };
 
   return {
@@ -118,6 +158,9 @@ export function useReportDetailsViewModel() {
     data,
     comments,
     liking,
+    verifying,
+    commentSubmitting,
+    verificationTargetId: resolveVerificationTargetId(data, postIdParam),
     enviarComentario,
     editarComentario,
     excluirComentario,

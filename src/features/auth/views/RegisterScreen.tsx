@@ -1,80 +1,80 @@
 import React from 'react';
-import { View, TextInput, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Text } from 'react-native';
-import { Feather } from '@expo/vector-icons';
-import { Colors } from '@/core/constants/theme';
-import { wazeAuthStyles as styles } from './styles';
+
+import { AuthInput } from '@/features/auth/components/AuthInput';
+import { AuthPrimaryButton } from '@/features/auth/components/AuthPrimaryButton';
+import { AuthScaffold } from '@/features/auth/components/AuthScaffold';
 import { useAuthViewModel } from '../viewmodels/useAuthViewModel';
 
 export function RegisterScreen() {
   const router = useRouter();
-  const colorScheme = 'light';
-  const isDark = false;
-  const colors = Colors.light;
   const vm = useAuthViewModel();
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={styles.logoContainer}>
-        <Text style={[styles.slogan, isDark && styles.sloganDark, { marginBottom: 32 }]}>
-          Crie sua Conta
-        </Text>
-      </View>
+    <AuthScaffold
+      eyebrow="Criar conta"
+      title="Junte-se à comunidade"
+      subtitle="Crie seu acesso para reportar riscos e ajudar sua região."
+      onBack={() => router.replace({ pathname: '/welcome', params: { slide: 1 } } as any)}
+      footer={
+        <Pressable
+          onPress={() => router.push('/login' as any)}
+          style={({ pressed }) => ({ opacity: pressed ? 0.84 : 1 })}
+        >
+          <Text className="text-sm text-slate-500">
+            Já possui conta? <Text className="font-semibold text-blue-600">Fazer login</Text>
+          </Text>
+        </Pressable>
+      }
+    >
+      <View>
 
-      <View style={[styles.inputContainer, isDark && styles.inputContainerDark]}>
-        <Feather name="user" size={20} color={colors.icon} />
-        <TextInput
-          style={[styles.input, isDark && styles.inputDark]}
-          placeholder="Seu Nome Completo"
-          placeholderTextColor={colors.icon}
+        <AuthInput
+          icon="user"
+          label="Nome completo"
+          placeholder="Seu nome"
+          autoCapitalize="words"
+          textContentType="name"
+          returnKeyType="next"
           value={vm.name}
           onChangeText={vm.setName}
         />
-      </View>
 
-      <View style={[styles.inputContainer, isDark && styles.inputContainerDark]}>
-        <Feather name="mail" size={20} color={colors.icon} />
-        <TextInput
-          style={[styles.input, isDark && styles.inputDark]}
-          placeholder="Seu E-mail"
-          placeholderTextColor={colors.icon}
+        <AuthInput
+          icon="mail"
+          label="E-mail"
+          placeholder="voce@empresa.com"
           keyboardType="email-address"
           autoCapitalize="none"
+          autoCorrect={false}
+          textContentType="emailAddress"
+          returnKeyType="next"
           value={vm.email}
           onChangeText={vm.setEmail}
         />
-      </View>
 
-      <View style={[styles.inputContainer, isDark && styles.inputContainerDark]}>
-        <Feather name="lock" size={20} color={colors.icon} />
-        <TextInput
-          style={[styles.input, isDark && styles.inputDark]}
-          placeholder="Sua Senha"
-          placeholderTextColor={colors.icon}
+        <AuthInput
+          icon="lock"
+          label="Senha"
+          placeholder="Crie uma senha segura"
           secureTextEntry
+          textContentType="newPassword"
+          returnKeyType="done"
+          hint="Coloque uma senha fácil."
           value={vm.password}
           onChangeText={vm.setPassword}
         />
+
+        <View className="mt-6">
+          <AuthPrimaryButton
+            label="Cadastrar"
+            icon="arrow-right"
+            onPress={vm.handleRegister}
+            isLoading={vm.isSubmitting}
+          />
+        </View>
       </View>
-
-      <TouchableOpacity
-        style={[styles.primaryButton, { backgroundColor: colors.tint, marginTop: 32 }]}
-        onPress={vm.handleRegister}
-        disabled={vm.isSubmitting}
-      >
-        {vm.isSubmitting ? (
-          <ActivityIndicator color="#fff" />
-        ) : (
-          <Text style={styles.buttonText}>Cadastrar</Text>
-        )}
-      </TouchableOpacity>
-
-      <TouchableOpacity onPress={() => router.back()}>
-        <Text style={styles.footerText}>
-          Já possui conta? <Text style={[styles.linkText, { color: colors.tint }]}>Fazer Login</Text>
-        </Text>
-      </TouchableOpacity>
-    </View>
+    </AuthScaffold>
   );
 }

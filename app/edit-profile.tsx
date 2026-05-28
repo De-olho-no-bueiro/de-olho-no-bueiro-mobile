@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import {
   Alert,
+  Platform,
   ScrollView,
   StyleSheet,
   TextInput,
@@ -19,6 +20,7 @@ import { ThemedView } from '@/core/components/atoms/themed-view';
 import { Colors } from '@/core/constants/theme';
 import { useAuth } from '@/core/contexts/auth-context';
 import { useColorScheme } from '@/core/hooks/use-color-scheme';
+import { navigateBackOrFallback } from '@/core/utils/navigation';
 import { changeMyPassword, updateMyProfile } from '@/features/configuracoes/services/profile-api';
 
 export default function EditProfileScreen() {
@@ -32,6 +34,7 @@ export default function EditProfileScreen() {
   const [name, setName] = useState(user?.name || '');
   const [email] = useState(user?.email || '');
   const [profilePicture, setProfilePicture] = useState<string | null>(user?.profilePicture || null);
+  const [showWebPhotoOptions, setShowWebPhotoOptions] = useState(false);
   const [showUrlInput, setShowUrlInput] = useState(false);
   const [imageUrl, setImageUrl] = useState('');
   const [currentPassword, setCurrentPassword] = useState('');
@@ -132,6 +135,11 @@ export default function EditProfileScreen() {
   };
 
   const openPhotoOptions = () => {
+    if (Platform.OS === 'web') {
+      setShowWebPhotoOptions((value) => !value);
+      return;
+    }
+
     Alert.alert('Foto de perfil', 'Escolha como deseja alterar sua foto.', [
       { text: 'Câmera', onPress: handleTakePhoto },
       { text: 'Galeria', onPress: handlePickFromGallery },
@@ -204,7 +212,7 @@ export default function EditProfileScreen() {
       }
 
       Alert.alert('Sucesso', 'Perfil atualizado com sucesso.');
-      router.back();
+      navigateBackOrFallback(router, '/(tabs)/configuracoes');
     } catch (error: any) {
       Alert.alert('Erro', error?.message || 'Falha ao salvar dados.');
     } finally {
@@ -223,7 +231,7 @@ export default function EditProfileScreen() {
       >
         <View style={styles.header}>
           <TouchableOpacity
-            onPress={() => router.back()}
+            onPress={() => navigateBackOrFallback(router, '/(tabs)/configuracoes')}
             style={[styles.backButton, { backgroundColor: isDark ? '#1C2730' : '#E8F4F8' }]}
           >
             <IconSymbol name="chevron.left" size={22} color="#0A7EA4" />
@@ -280,6 +288,76 @@ export default function EditProfileScreen() {
             <IconSymbol name="camera.fill" size={16} color="#0A7EA4" />
             <ThemedText style={styles.badgeText}>Toque no lápis para trocar a foto</ThemedText>
           </View>
+
+          {Platform.OS === 'web' && showWebPhotoOptions && (
+            <View
+              style={[
+                styles.webPhotoOptions,
+                {
+                  backgroundColor: isDark ? '#102630' : '#F3FAFD',
+                  borderColor: isDark ? '#294452' : '#D2ECF4',
+                },
+              ]}
+            >
+              <TouchableOpacity
+                style={[styles.webPhotoAction, { borderColor: colors.tint }]}
+                activeOpacity={0.8}
+                onPress={() => {
+                  setShowWebPhotoOptions(false);
+                  void handleTakePhoto();
+                }}
+              >
+                <IconSymbol name="camera.fill" size={18} color={colors.tint} />
+                <ThemedText style={[styles.webPhotoActionText, { color: colors.tint }]}>
+                  Tirar foto
+                </ThemedText>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.webPhotoAction, { borderColor: colors.tint }]}
+                activeOpacity={0.8}
+                onPress={() => {
+                  setShowWebPhotoOptions(false);
+                  void handlePickFromGallery();
+                }}
+              >
+                <IconSymbol name="photo.on.rectangle" size={18} color={colors.tint} />
+                <ThemedText style={[styles.webPhotoActionText, { color: colors.tint }]}>
+                  Escolher da galeria
+                </ThemedText>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.webPhotoAction, { borderColor: colors.tint }]}
+                activeOpacity={0.8}
+                onPress={() => {
+                  setShowWebPhotoOptions(false);
+                  setShowUrlInput((value) => !value);
+                }}
+              >
+                <IconSymbol name="globe" size={18} color={colors.tint} />
+                <ThemedText style={[styles.webPhotoActionText, { color: colors.tint }]}>
+                  Usar URL
+                </ThemedText>
+              </TouchableOpacity>
+
+              {profilePicture ? (
+                <TouchableOpacity
+                  style={[styles.webPhotoAction, styles.webPhotoActionDanger]}
+                  activeOpacity={0.8}
+                  onPress={() => {
+                    setShowWebPhotoOptions(false);
+                    setProfilePicture(null);
+                  }}
+                >
+                  <IconSymbol name="trash.fill" size={18} color="#B42318" />
+                  <ThemedText style={[styles.webPhotoActionText, { color: '#B42318' }]}>
+                    Remover foto
+                  </ThemedText>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+          )}
         </View>
 
         {showUrlInput && (
@@ -581,6 +659,31 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     color: '#0A7EA4',
+  },
+  webPhotoOptions: {
+    marginTop: 16,
+    borderWidth: 1,
+    borderRadius: 20,
+    padding: 14,
+    gap: 10,
+  },
+  webPhotoAction: {
+    minHeight: 46,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingHorizontal: 14,
+  },
+  webPhotoActionDanger: {
+    borderColor: '#FDCFC2',
+    backgroundColor: '#FFF5F3',
+  },
+  webPhotoActionText: {
+    fontWeight: '700',
+    fontSize: 14,
   },
   formCard: {
     borderRadius: 28,

@@ -1,11 +1,9 @@
 // Fallback for using MaterialIcons on Android and web.
 
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import { SymbolWeight, SymbolViewProps } from 'expo-symbols';
-import { ComponentProps } from 'react';
+import { SymbolWeight } from 'expo-symbols';
 import { OpaqueColorValue, type StyleProp, type TextStyle } from 'react-native';
 
-type IconMapping = Record<string, ComponentProps<typeof MaterialIcons>['name']>;
 type IconSymbolName = string;
 
 /**
@@ -16,12 +14,14 @@ type IconSymbolName = string;
 const MAPPING: any = {
   'house.fill': 'home',
   'paperplane.fill': 'send',
+  'chevron.left': 'chevron-left',
   'chevron.left.forwardslash.chevron.right': 'code',
   'chevron.right': 'chevron-right',
   'mappin.and.ellipse': 'place',
   'location.fill': 'my-location',
   'camera.fill': 'photo-camera',
   'trash': 'delete',
+  'trash.fill': 'delete',
   'cube': 'widgets',
   'square.and.arrow.up': 'share',
   'ellipsis': 'more-horiz',
@@ -29,11 +29,21 @@ const MAPPING: any = {
   'person.crop.circle.fill': 'person',
   'map': 'map',
   'exclamationmark.triangle': 'warning',
+  'exclamationmark.triangle.fill': 'warning',
   'clock': 'schedule',
   'water': 'water-drop',
   'manhole': 'electrical-services',
   'magnifyingglass': 'search',
   'xmark.circle.fill': 'cancel',
+  'drop.fill': 'water-drop',
+  'photo.fill': 'photo',
+  'photo.on.rectangle': 'photo-library',
+  globe: 'public',
+  heart: 'favorite-border',
+  'heart.fill': 'favorite',
+  'bubble.right': 'chat-bubble-outline',
+  'checkmark.seal': 'verified',
+  checkmark: 'check',
 };
 
 /**
@@ -53,5 +63,5 @@ export function IconSymbol({
   style?: StyleProp<TextStyle>;
   weight?: SymbolWeight;
 }) {
-  return <MaterialIcons color={color} size={size} name={MAPPING[name]} style={style} />;
+  return <MaterialIcons color={color} size={size} name={MAPPING[name] ?? 'help-outline'} style={style} />;
 }

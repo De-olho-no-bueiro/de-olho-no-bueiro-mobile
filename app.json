@@ -1,10 +1,10 @@
 {
   "expo": {
-    "name": "de-olho-no-bueiro",
+    "name": "De olho no bueiro",
     "slug": "de-olho-no-bueiro",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/Novo-logo-bueiro.png",
     "scheme": "deolhonobueiro",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -15,14 +15,12 @@
         "NSLocationAlwaysAndWhenInUseUsageDescription": "O app usa sua localização em segundo plano para avisar quando você se aproximar de um incidente ativo.",
         "ITSAppUsesNonExemptEncryption": false
       },
-      "bundleIdentifier": "com.anonymous.deolhonobueiro"
+      "bundleIdentifier": "com.unifor.deolhonobueiro"
     },
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+        "foregroundImage": "./assets/images/Novo-logo-bueiro.png"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
@@ -34,18 +32,18 @@
         "android.permission.FOREGROUND_SERVICE_LOCATION",
         "android.permission.RECORD_AUDIO"
       ],
-      "package": "com.anonymous.deolhonobueiro"
+      "package": "com.unifor.deolhonobueiro"
     },
     "web": {
       "output": "static",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/images/Novo-logo-bueiro.png"
     },
     "plugins": [
       "expo-router",
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/splash-icon.png",
+          "image": "./assets/images/Novo-logo-bueiro.png",
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#ffffff",
