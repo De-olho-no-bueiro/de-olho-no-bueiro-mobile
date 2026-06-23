@@ -89,8 +89,8 @@ export async function persistSession(params: {
   console.log('[Auth][Storage] session persisted:', {
     userId: nextUser.id,
     email: nextUser.email,
-    accessToken: `${params.accessToken.slice(0, 12)}... len=${params.accessToken.length}`,
-    refreshToken: `${params.refreshToken.slice(0, 8)}... len=${params.refreshToken.length}`,
+    accessToken: params.accessToken ? `${params.accessToken.slice(0, 12)}... len=${params.accessToken.length}` : 'none',
+    refreshToken: params.refreshToken ? `${params.refreshToken.slice(0, 8)}... len=${params.refreshToken.length}` : 'none',
   });
 
   return nextUser;

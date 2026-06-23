@@ -130,6 +130,19 @@ export function MapScreen() {
     : "rgba(255,255,255,0.9)";
   const isMapLoading = vm.isMapBootstrapping;
 
+  const androidCalloutBottomInset =
+    vm.isDrawing
+      ? 176
+      : vm.selectedPoint && !vm.modalVisible
+        ? 196
+        : tipoAlerta === "choosing"
+          ? 214
+          : tipoAlerta === "enchente"
+            ? 224
+            : tipoAlerta === "bueiro"
+              ? 196
+              : 120;
+
   return (
     <ThemedView style={styles.container}>
       <View style={[styles.searchContainer, { paddingTop: insets.top + 16 }]}>
@@ -289,6 +302,7 @@ export function MapScreen() {
           selectedPoint={vm.selectedPoint}
           colors={colors}
           tintColor={colors.tint}
+          androidBottomOverlayInset={androidCalloutBottomInset}
         />
       )}
 
