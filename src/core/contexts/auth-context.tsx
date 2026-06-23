@@ -144,9 +144,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       let data: any;
       if (!resp.ok) {
         data = await readResponseBody(resp);
-        throw new Error(
-          typeof data === 'string' ? data || 'Credenciais inválidas' : data?.message || 'Credenciais inválidas',
-        );
+        const errorMsg = typeof data === 'string' 
+          ? (data.includes('<html') ? `Erro de servidor (Status ${resp.status})` : data)
+          : data?.message || 'Credenciais inválidas';
+        throw new Error(errorMsg || 'Credenciais inválidas');
       }
       
       data = await readResponseBody(resp);
@@ -189,9 +190,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       let data: any;
       if (!resp.ok) {
         data = await readResponseBody(resp);
-        throw new Error(
-          typeof data === 'string' ? data || 'Falha no cadastro' : data?.message || 'Falha no cadastro',
-        );
+        const errorMsg = typeof data === 'string' 
+          ? (data.includes('<html') ? `Erro de servidor (Status ${resp.status})` : data)
+          : data?.message || 'Falha no cadastro';
+        throw new Error(errorMsg || 'Falha no cadastro');
       }
       
       data = await readResponseBody(resp);
